@@ -212,35 +212,36 @@ namespace unitauto {
         }
 
         if (j.is_string()) {
-            return j.get<std::string>();
-            // std::string val = j.get<std::string>();
+            // return j.get<std::string>();
+            std::string val = j.get<std::string>();
+            size_t ind = val.find(':');
             // const char *s = val.c_str();
             // auto pc = strchr(s, ':');
             // int ind = pc - s;
-            // if (ind < 0) {
-            //     return val;
-            // }
-            //
-            // std::string type = val.substr(0, ind);
-            // std::string vs = val.substr(ind + 1);
-            //
-            // if (type == "int") {
-            //     return std::stoi(vs);
-            // }
-            // if (type == "long") {
-            //     return std::stol(vs);
-            // }
-            // if (type == "float") {
-            //     return std::stof(vs);
-            // }
-            // if (type == "double") {
-            //     return std::stod(vs);
-            // }
-            // if (type == "string" || type == "std::string") {
-            //     return vs;
-            // }
-            //
-            // return json_2_obj(vs, type);
+            if (ind == std::string::npos || ind < 0) {
+                return val;
+            }
+
+            std::string type = val.substr(0, ind);
+            std::string vs = val.substr(ind + 1);
+
+            if (type == "int") {
+                return std::stoi(vs);
+            }
+            if (type == "long") {
+                return std::stol(vs);
+            }
+            if (type == "float") {
+                return std::stof(vs);
+            }
+            if (type == "double") {
+                return std::stod(vs);
+            }
+            if (type == "string" || type == "std::string") {
+                return vs;
+            }
+
+            return json_2_obj(vs, type);
         }
 
         if (j.is_object()) {
