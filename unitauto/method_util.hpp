@@ -294,17 +294,27 @@ namespace unitauto {
         nlohmann::json result;
 
         try {
-            bool is_static =  j["static"];
-            std::string package =  j["package"];
-            std::string clazz =  j["class"];
-            std::string method =  j["method"];
-
-            std::string path = method;
-            if (! clazz.empty()) {
-                path = clazz + "." + method;
+            json method = j["method"];
+            std::string mtd = method.empty() ? "" : method.get<std::string>();
+            if (mtd.empty()) {
+                throw "method cannot be empty! should be a string!";
             }
-            if (! package.empty()) {
-                path = package + "." + method;
+
+            json is_static = j["static"];
+            bool is_sttc = is_static.empty() ? false : is_static.get<bool>();
+
+            json package = j["package"];
+            std::string pkg = package.empty() ? "" : package.get<std::string>();
+
+            json clazz = j["class"];
+            std::string cls = clazz.empty() ? "" : clazz.get<std::string>();
+
+            std::string path = mtd;
+            if (! cls.empty()) {
+                path = cls + "." + path;
+            }
+            if (! pkg.empty()) {
+                path = pkg + "." + path;
             }
 
             nlohmann::json args_ = j["args"];
@@ -320,12 +330,29 @@ namespace unitauto {
                 std::any a = json_to_any(arg);
                 // std::any a = static_cast<std::any>(arg);
                 args.push_back(a);
+
+                json ma;
                 try {
-                    methodArgs.push_back(any_to_json(a));
+                    auto type_cs = typeid(a).name();  // type_id.name();
+                    std::string type(type_cs);
+                    if (type_cs == 0 || type.empty()) {
+                        ma["type"] = arg.type_name();
+                    } else {
+                        ma["type"] = type;
+                    }
                 } catch (const std::exception& e) {
-                    std::cout << "invoke_json  try { \n methodArgs.push_back(any_to_json(a)); \n } catch (const std::exception& e) = " << e.what() << " >> methodArgs.push_back(arg);" << std::endl;
-                    methodArgs.push_back(arg);
+                    std::cout << "invoke_json  try { \n auto type_cs = typeid(a).name();... \n } catch (const std::exception& e) = " << e.what() << " >> ma[\"type\"] = arg.type_name();" << std::endl;
+                    ma["type"] = arg.type_name();
                 }
+
+                try {
+                    ma["value"] = any_to_json(a);
+                } catch (const std::exception& e) {
+                    std::cout << "invoke_json  try { \n ma[\"value\"] = any_to_json(a); \n } catch (const std::exception& e) = " << e.what() << " >> ma[\"value\"] = arg;" << std::endl;
+                    ma["value"] = arg;
+                }
+
+                methodArgs.push_back(ma);
             }
 
             std::any ret = invoke(path, args);
