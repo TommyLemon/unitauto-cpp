@@ -1,5 +1,8 @@
 #include "unitauto/method_util.hpp"
+// #include "unitauto/server.hpp"
 #include <iostream>
+
+#include "unitauto/test/test_util.hpp"
 
 using json = unitauto::json;
 
@@ -90,6 +93,50 @@ Moment newMoment(long id) {
     return Moment(id);
 }
 
+
+
+// 自定义类型示例
+struct Person {
+    std::string name;
+    int age;
+};
+
+// 自定义类型的 to_json 函数
+void to_json(json& j, const Person& p) {
+    j = json{{"name", p.name}, {"age", p.age}};
+}
+
+// // 特化自定义类型的转换函数
+// template<>
+// void register_converter<Person>() {
+//     unitauto::converters[typeid(Person).name()] = [](std::any value) -> json {
+//         return std::any_cast<Person>(value);
+//     };
+// }
+//
+
+
+
+ int test() {
+    // 示例值
+    std::any ret = Person{"Alice", 30};
+    auto type = typeid(ret).name();
+
+    unitauto::register_converter<Person>();
+
+    json result;
+    result["code"] = 200;
+    result["msg"] = "success";
+    result["type"] = type;
+    result["return"] = unitauto::any_to_json(ret);
+    result["methodArgs"] = json::array({{{"type", "long"}, {"value", 1}}, {{"type", "long"}, {"value", 2}}});
+
+    std::cout << "\n\ntest return " << result.dump(4) << std::endl;
+
+    return 0;
+}
+
+
 int main() {
     // 注册函数
     unitauto::add_func("print", std::function<void(const std::string &)>(print));
@@ -134,7 +181,7 @@ int main() {
     std::string str = R"({"id":1, "sex":1, "name":"John Doe", "date":1705293785163})";
     json j = json::parse(str);
 
-    User p = j.get<User>();
+    User u = j.get<User>();
     void* obj;
     try {
         obj = unitauto::json_2_obj(str, "User");
@@ -179,11 +226,11 @@ int main() {
     //
     // }
 
-    User user;
-
-    auto f3 = std::mem_fn(&User::is_male);
-    auto r3 = f3(&user);
-    std::cout << "\nf3(&user) = " << r3;
+    // User user;
+    //
+    // auto f3 = std::mem_fn(&User::is_male);
+    // auto r3 = f3(&user);
+    // std::cout << "\nf3(&user) = " << r3;
 
     // auto f4 = std::bind(ptr_to_print_sum, &user, 95, 1);
     // int r4 = f4();
@@ -207,5 +254,22 @@ int main() {
     // auto c = func(arr...);
     // std::cout << "\nfunc(5, 2) = " << c;
 
+    test();
+
+    // unitauto::add_type<unitauto::test::TestUtil>("unitauto.test.TestUtil");
+    unitauto::add_func("unitauto.test.divide", std::function<double(double,double)>(unitauto::test::divide));
+    std::vector<std::any> v;
+    v.push_back(3.08);
+    v.push_back(0.5);
+
+    auto dr = unitauto::invoke("unitauto.test.divide", v);
+    std::cout << "invoke(\"unitauto.test.divide\", {3.08, 0.5}) = " << std::any_cast<double>(dr) << std::endl;
+
+    User user;
+    unitauto::add_func("unitauto.test.User.is_male", &user, &User::is_male);
+
+    unitauto::start(8084);
+
     return 0;
 }
+
