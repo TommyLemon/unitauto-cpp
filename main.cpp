@@ -256,13 +256,16 @@ int main() {
 
     test();
 
-    // unitauto::add_type<unitauto::test::TestUtil>("unitauto.test.TestUtil");
+    unitauto::add_type<unitauto::test::TestUtil>("unitauto.test.TestUtil");
+
+    unitauto::add_func("unitauto.test.TestUtil.divide", (unitauto::test::TestUtil *) nullptr, &unitauto::test::TestUtil::divide);
     unitauto::add_func("unitauto.test.divide", std::function<double(double,double)>(unitauto::test::divide));
     std::vector<std::any> v;
     v.push_back(3.08);
     v.push_back(0.5);
 
     auto dr = unitauto::invoke("unitauto.test.divide", v);
+
     std::cout << "invoke(\"unitauto.test.divide\", {3.08, 0.5}) = " << std::any_cast<double>(dr) << std::endl;
 
     User user;

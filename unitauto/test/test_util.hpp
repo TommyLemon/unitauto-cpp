@@ -9,22 +9,22 @@
 
 namespace unitauto::test {
 
-     static double divide(int a, int b) {
+     static double divide(double a, double b) {
           return a/b;
      }
 
-     static int contains(long arr[], long l) {
+     static bool contains(long arr[], long l) {
           if (arr == nullptr) {
-               return -1;
+               return false;
           }
 
           for (int i = 0; i < sizeof arr; ++i) {
                if (arr[i] == l) {
-                    return i;
+                    return true;
                }
           }
 
-          return -1;
+          return false;
      }
 
      static int index(std::string arr[], std::string s) {
@@ -42,9 +42,13 @@ namespace unitauto::test {
      }
 
      class TestUtil {
-          static double divide(double a, double b) {
+     public:
+          long id;
+          double divide(int a, int b) {
                return a/b;
           }
+
+          NLOHMANN_DEFINE_TYPE_INTRUSIVE(TestUtil, id)
      };
 
 }

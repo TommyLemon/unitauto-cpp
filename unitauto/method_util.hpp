@@ -201,7 +201,7 @@ namespace unitauto {
             return it->second(value);
         }
 
-        return (json &) value;
+        return (json&) value;
     }
 
     // any_to_json 函数模板
@@ -785,6 +785,38 @@ namespace unitauto {
         return result;
     }
 
+    std::string get_type(std::any a) {
+        auto type_cs = a.type().name(); // typeid(a).name();  // TYPE.name();
+        std::string type(type_cs);
+        if (type_cs == 0 || type.empty()) {
+            type = typeid(a.type()).name();
+        }
+
+        if (type == "b") {
+            return TYPE_BOOL;
+        }
+        if (type == "c") {
+            return TYPE_CHAR;
+        }
+        if (type == "i") {
+            return TYPE_INT;
+        }
+        if (type == "l") {
+            return TYPE_LONG;
+        }
+        if (type == "ll") {
+            return TYPE_LONG_LONG;
+        }
+        if (type == "f") {
+            return TYPE_FLOAT;
+        }
+        if (type == "d") {
+            return TYPE_DOUBLE;
+        }
+
+        return type;
+    }
+
     static nlohmann::json invoke_json(nlohmann::json j) {
         nlohmann::json result;
 
@@ -828,13 +860,8 @@ namespace unitauto {
 
                 json ma;
                 try {
-                    auto type_cs = typeid(a).name();  // TYPE.name();
-                    std::string type(type_cs);
-                    if (type_cs == 0 || type.empty()) {
-                        ma["type"] = arg.type_name();
-                    } else {
-                        ma["type"] = type;
-                    }
+                    std::string t = get_type(a);
+                    ma["type"] = t.empty() ? arg.type_name() : t;
                 } catch (const std::exception& e) {
                     std::cout << "invoke_json  try { \n auto type_cs = typeid(a).name();... \n } catch (const std::exception& e) = " << e.what() << " >> ma[\"type\"] = arg.type_name();" << std::endl;
                     ma["type"] = arg.type_name();
@@ -851,10 +878,7 @@ namespace unitauto {
             }
 
             std::any ret = invoke(path, args);
-
-            // auto TYPE = typeid(ret);
-            auto type_cs = typeid(ret).name();  // TYPE.name();
-            std::string type(type_cs);
+            std::string type = get_type(ret);
 
             result["code"] = 200;
             result["msg"] = "success";
@@ -886,7 +910,7 @@ namespace unitauto {
         return result;
     }
 
-        // 处理请求并生成响应
+    // 处理请求并生成响应
     inline void handle_request(int client_socket) {
         char buffer[1024];
         int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
