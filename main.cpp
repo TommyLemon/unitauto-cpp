@@ -268,6 +268,9 @@ int main() {
     User user;
     unitauto::add_func("unitauto.test.User.is_male", &user, &User::is_male);
 
+    unitauto::add_func("unitauto.test.contains", std::function<bool(long[],long)>(unitauto::test::contains));
+    unitauto::add_func("unitauto.test.index", std::function<int(std::string[],std::string)>(unitauto::test::index));
+
     unitauto::start(8084);
 
     return 0;

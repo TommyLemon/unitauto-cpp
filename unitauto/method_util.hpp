@@ -458,6 +458,97 @@ namespace unitauto {
             std::string type_s = type;
             int l = type_s.size();
             if (l > 2 && type_s.substr( l - 2, l) == "[]") {
+                if (type == TYPE_BOOL_ARR) {
+                    auto vec = value.get<std::vector<bool>>();
+                    bool arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+
+                if (type == TYPE_CHAR_ARR) {
+                    auto vec = value.get<std::vector<char>>();
+                    char arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+
+                if (type == TYPE_BYTE_ARR) {
+                    auto vec = value.get<std::vector<std::byte>>();
+                    std::byte arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+
+                if (type == TYPE_SHORT_ARR) {
+                    auto vec = value.get<std::vector<short>>();
+                    short arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+
+                if (type == TYPE_INT_ARR) {
+                    auto vec = value.get<std::vector<int>>();
+                    int arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+
+
+                if (type == TYPE_INT_ARR) {
+                    auto vec = value.get<std::vector<int>>();
+                    int arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+
+                if (type == TYPE_LONG_ARR) {
+                    auto vec = value.get<std::vector<long>>();
+                    long arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+
+                if (type == TYPE_LONG_LONG_ARR) {
+                    auto vec = value.get<std::vector<long long>>();
+                    long long arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+
+                if (type == TYPE_FLOAT_ARR) {
+                    auto vec = value.get<std::vector<float>>();
+                    float arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+
+                if (type == TYPE_DOUBLE_ARR) {
+                    auto vec = value.get<std::vector<double>>();
+                    double arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+
                 if (type == TYPE_STRING_ARR) {
                     auto vec = value.get<std::vector<std::string>>();
                     std::string arr[vec.size()];
