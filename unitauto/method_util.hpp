@@ -1,3 +1,17 @@
+/*Copyright ©2024 TommyLemon(https://github.com/TommyLemon)
+
+Licensed under the Apache License, Version 2.0 (the "License")
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.*/
+
 #include <string>
 #include <unordered_map>
 #include "nlohmann/json.hpp"
@@ -13,6 +27,8 @@
 #include <unistd.h>
 #include <typeinfo>
 
+/**@author Lemon
+ */
 namespace unitauto {
     using json = nlohmann::json;
 
@@ -48,6 +64,7 @@ namespace unitauto {
     // 注册类型
     template<typename T>
     static void add_type(const std::string& type) {
+        // typeid(T).name() 会得到 4User 这种带了其它字符的名称
         TYPE_MAP[type] = [](const std::string& str) -> void* {
             if (str.empty()) {
                 T* obj = new T();
@@ -77,7 +94,7 @@ namespace unitauto {
         if (it != FUNC_MAP.end()) {
             return it->second(args);
         }
-        throw std::runtime_error("Unkown func: " + name + ", call add_func/add_func firstly!");
+        throw std::runtime_error("Unkown func: " + name + ", call add_func firstly!");
     }
 
     // 执行非 void 函数
@@ -120,17 +137,13 @@ namespace unitauto {
     // 注册方法(成员函数)
     template<typename Ret, typename T, typename... Args>
     static void add_func(const std::string &name, T *instance, Ret (T::*func)(Args...)) {
-        // if (instance == nullptr) {
-        //     FUNC_MAP[name] = [func](std::vector<std::any> args) -> std::any {
-        //         if constexpr (std::is_void_v<Ret>) {
-        //             invoke_void(func, args, std::index_sequence_for<Args...>{});
-        //             return {};
-        //         } else {
-        //             return invoke(func, args, std::index_sequence_for<Args...>{});
-        //         }
-        //     };
-        //     return;
-        // }
+        if (instance == nullptr) {
+            // instance = json_2_obj("", typeid(T).name());
+
+            if (instance == nullptr) {
+                instance = new T();
+            }
+        }
 
         FUNC_MAP[name] = [instance, func](std::vector<std::any> args) -> std::any {
             if constexpr (std::is_void_v<Ret>) {
@@ -144,27 +157,38 @@ namespace unitauto {
 
     // 函数与方法(成员函数) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    static const auto TYPE_ID_BOOL = typeid(bool).name();
-    static const auto TYPE_ID_INT = typeid(int).name();
-    static const auto TYPE_ID_LONG = typeid(long).name();
-    static const auto TYPE_ID_FLOAT = typeid(float).name();
-    static const auto TYPE_ID_DOUBLE = typeid(double).name();
-    static const auto TYPE_ID_STR = typeid(std::string).name();
-    // static const auto TYPE_ID_ARR = typeid(std::array).name();
-    // static const auto TYPE_ID_OBJ = typeid(std::any).name();
-
-    std::map<std::string, std::any> TYPE_ID_MAP = {
-    };
-
+    static const std::string TYPE_ANY = "std::any"; // typeid(bool).name();
+    static const std::string TYPE_BOOL = "bool"; // typeid(bool).name();
+    static const std::string TYPE_CHAR = "char"; // typeid(char).name();
+    static const std::string TYPE_BYTE = "std::byte"; // typeid(std::byte).name();
+    static const std::string TYPE_SHORT = "short"; // typeid(bool).name();
+    static const std::string TYPE_INT = "int"; // typeid(int).name();
+    static const std::string TYPE_LONG = "long"; // typeid(long).name();
+    static const std::string TYPE_LONG_LONG = "long long"; // typeid(long).name();
+    static const std::string TYPE_FLOAT = "float"; // typeid(float).name();
+    static const std::string TYPE_DOUBLE = "double"; // typeid(double).name();
+    static const std::string TYPE_STRING = "std::string"; // typeid(std::string).name();
+    // static const auto TYPE_ARR = typeid(std::array).name();
+    static const std::string TYPE_ANY_ARR = "std::any[]"; // typeid(bool).name();
+    static const std::string TYPE_BOOL_ARR = "bool[]"; // typeid(bool).name();
+    static const std::string TYPE_CHAR_ARR = "char[]"; // typeid(char).name();
+    static const std::string TYPE_BYTE_ARR = "std::byte[]"; // typeid(std::byte).name();
+    static const std::string TYPE_SHORT_ARR = "short[]"; // typeid(bool).name();
+    static const std::string TYPE_INT_ARR = "int[]"; // typeid(int).name();
+    static const std::string TYPE_LONG_ARR = "long[]"; // typeid(long).name();
+    static const std::string TYPE_LONG_LONG_ARR = "long long[]"; // typeid(long).name();
+    static const std::string TYPE_FLOAT_ARR = "float[]"; // typeid(float).name();
+    static const std::string TYPE_DOUBLE_ARR = "double[]"; // typeid(double).name();
+    static const std::string TYPE_STRING_ARR = "std::string[]"; // typeid(std::string).name();
 
 
     // 类型转换函数映射
-    std::map<std::string, std::function<json(const std::any&)>> converters;
+    static std::map<std::string, std::function<json(const std::any&)>> CAST_MAP;
 
     // 注册类型转换函数
     template<typename T>
-    void register_converter() {
-        converters[typeid(T).name()] = [](std::any value) -> json {
+    void register_cast() {
+        CAST_MAP[typeid(T).name()] = [](std::any value) -> json {
             return std::any_cast<T>(value);
         };
     }
@@ -172,37 +196,150 @@ namespace unitauto {
 
     // any_to_json 函数
     json _any_to_json(const std::any& value) {
-        auto it = converters.find(value.type().name());
-        if (it != converters.end()) {
+        auto it = CAST_MAP.find(value.type().name());
+        if (it != CAST_MAP.end()) {
             return it->second(value);
-        } else {
-            throw std::runtime_error("Unsupported type");
         }
+
+        return (json &) value;
     }
 
     // any_to_json 函数模板
     json any_to_json(const std::any& value) {
-        if (value.type() == typeid(int)) {
-            return std::any_cast<int>(value);
-        } else if (value.type() == typeid(double)) {
-            return std::any_cast<double>(value);
-        } else if (value.type() == typeid(std::string)) {
-            return std::any_cast<std::string>(value);
-        } else if (value.type() == typeid(bool)) {
-            return std::any_cast<bool>(value);
-        } else if (value.type() == typeid(std::vector<int>)) {
-            return std::any_cast<std::vector<int>>(value);
-        } else if (value.type() == typeid(std::map<std::string, int>)) {
-            return std::any_cast<std::map<std::string, int>>(value);
-        } else {
-            return _any_to_json(value);
-            // throw std::runtime_error("Unsupported type");
+        try {
+            if (value.type() == typeid(bool)) {
+                return std::any_cast<bool>(value);
+            }
+            if (value.type() == typeid(std::byte)) {
+                return std::any_cast<std::byte>(value);
+            }
+            if (value.type() == typeid(char)) {
+                return std::any_cast<char>(value);
+            }
+            if (value.type() == typeid(short)) {
+                return std::any_cast<short>(value);
+            }
+            if (value.type() == typeid(int)) {
+                return std::any_cast<int>(value);
+            }
+            if (value.type() == typeid(long)) {
+                return std::any_cast<long>(value);
+            }
+            if (value.type() == typeid(long long)) {
+                return std::any_cast<long long>(value);
+            }
+            if (value.type() == typeid(float)) {
+                return std::any_cast<float>(value);
+            }
+            if (value.type() == typeid(double)) {
+                return std::any_cast<double>(value);
+            }
+            if (value.type() == typeid(std::string)) {
+                return std::any_cast<std::string>(value);
+            }
+
+            // if (value.type() == typeid(bool&)) {
+            //     return std::any_cast<bool&>(value);
+            // }
+            // if (value.type() == typeid(std::byte&)) {
+            //     return std::any_cast<std::byte&>(value);
+            // }
+            // if (value.type() == typeid(char&)) {
+            //     return std::any_cast<char&>(value);
+            // }
+            // if (value.type() == typeid(short&)) {
+            //     return std::any_cast<short&>(value);
+            // }
+            // if (value.type() == typeid(int&)) {
+            //     return std::any_cast<int&>(value);
+            // }
+            // if (value.type() == typeid(long&)) {
+            //     return std::any_cast<long&>(value);
+            // }
+            // if (value.type() == typeid(long long&)) {
+            //     return std::any_cast<long long&>(value);
+            // }
+            // if (value.type() == typeid(float&)) {
+            //     return std::any_cast<float&>(value);
+            // }
+            // if (value.type() == typeid(double&)) {
+            //     return std::any_cast<double&>(value);
+            // }
+            // if (value.type() == typeid(std::string&)) {
+            //     return std::any_cast<std::string&>(value);
+            // }
+
+            if (value.type() == typeid(std::vector<bool>)) {
+                return std::any_cast<std::vector<bool>>(value);
+            }
+            if (value.type() == typeid(std::vector<char>)) {
+                return std::any_cast<std::vector<char>>(value);
+            }
+            if (value.type() == typeid(std::vector<std::byte>)) {
+                return std::any_cast<std::vector<std::byte>>(value);
+            }
+            if (value.type() == typeid(std::vector<short>)) {
+                return std::any_cast<short>(value);
+            }
+            if (value.type() == typeid(std::vector<int>)) {
+                return std::any_cast<std::vector<int>>(value);
+            }
+            if (value.type() == typeid(std::vector<long>)) {
+                return std::any_cast<std::vector<long>>(value);
+            }
+            if (value.type() == typeid(std::vector<long long>)) {
+                return std::any_cast<std::vector<long long>>(value);
+            }
+            if (value.type() == typeid(std::vector<float>)) {
+                return std::any_cast<std::vector<float>>(value);
+            }
+            if (value.type() == typeid(std::vector<double>)) {
+                return std::any_cast<std::vector<double>>(value);
+            }
+            if (value.type() == typeid(std::vector<std::string>)) {
+                return std::any_cast<std::vector<std::string>>(value);
+            }
+            // if (value.type() == typeid(std::vector<std::any>)) {
+            //     return (std::vector<std::any>) value; //  std::any_cast<std::vector<std::any>>(value);
+            // }
+
+            if (value.type() == typeid(std::map<std::string, bool>)) {
+                return std::any_cast<std::map<std::string, bool>>(value);
+            }
+            if (value.type() == typeid(std::map<std::string, std::byte>)) {
+                return std::any_cast<std::map<std::string, std::byte>>(value);
+            }
+            if (value.type() == typeid(std::map<std::string, char>)) {
+                return std::any_cast<std::map<std::string, char>>(value);
+            }
+            if (value.type() == typeid(std::map<std::string, short>)) {
+                return std::any_cast<std::map<std::string, short>>(value);
+            }
+            if (value.type() == typeid(std::map<std::string, int>)) {
+                return std::any_cast<std::map<std::string, int>>(value);
+            }
+            if (value.type() == typeid(std::map<std::string, long>)) {
+                return std::any_cast<std::map<std::string, long>>(value);
+            }
+            if (value.type() == typeid(std::map<std::string, long long>)) {
+                return std::any_cast<std::map<std::string, long long>>(value);
+            }
+            if (value.type() == typeid(std::map<std::string, std::string>)) {
+                return std::any_cast<std::map<std::string, std::string>>(value);
+            }
+            // if (value.type() == typeid(std::map<std::string, std::any>)) {
+            //     return std::any_cast<std::map<std::string, std::any>>(value);
+            // }
+        } catch (const std::exception& e) {
+            std::cout << e.what() << std::endl;
         }
+
+        return _any_to_json(value);
     }
 
     static std::any json_to_any(json j) {
         if (j.is_null()) {
-            return NULL;
+            return nullptr;
         }
 
         if (j.is_number_integer()) {
@@ -231,19 +368,46 @@ namespace unitauto {
             std::string type = val.substr(0, ind);
             std::string vs = val.substr(ind + 1);
 
-            if (type == "int") {
+            if (type == TYPE_ANY) {
+                if (vs == "nullptr") {
+                    return nullptr;
+                }
+                if (vs == "NULL") {
+                    return NULL;
+                }
+                return vs;
+            }
+            if (type == TYPE_BOOL) {
+                if (vs == "true") {
+                    return true;
+                }
+                if (vs == "false") { //  || vs == "") {
+                    return false;
+                }
+                throw vs + " cannot be cast to bool! only true, false illegal!";
+            }
+            if (type == TYPE_CHAR) {
+                if (vs.size() != 1) {
+                    throw vs + " size != 1 ! cannot be cast to char!";
+                }
+                return vs.at(0);
+            }
+            if (type == TYPE_BYTE || type == TYPE_SHORT || type == TYPE_INT) {
                 return std::stoi(vs);
             }
-            if (type == "long") {
+            if (type == TYPE_LONG) {
                 return std::stol(vs);
             }
-            if (type == "float") {
+            if (type == TYPE_LONG_LONG) {
+                return std::stoll(vs);
+            }
+            if (type == TYPE_FLOAT) {
                 return std::stof(vs);
             }
-            if (type == "double") {
+            if (type == TYPE_DOUBLE) {
                 return std::stod(vs);
             }
-            if (type == "string" || type == "std::string") {
+            if (type == TYPE_STRING) {
                 return vs;
             }
 
@@ -257,24 +421,52 @@ namespace unitauto {
             }
 
             auto value = j["value"];
-            if (type == "int") {
+            if (type == TYPE_BOOL) {
+                return value.get<bool>();
+            }
+            if (type == TYPE_CHAR) {
+                return value.get<char>();
+            }
+            if (type == TYPE_BYTE) {
+                return value.get<std::byte>();
+            }
+            if (type == TYPE_SHORT) {
+                return value.get<short>();
+            }
+            if (type == TYPE_INT) {
                 return value.get<int>();
             }
-            if (type == "long") {
+            if (type == TYPE_LONG) {
                 return value.get<long>();
             }
-            if (type == "float") {
+            if (type == TYPE_LONG_LONG) {
+                return value.get<long long>();
+            }
+            if (type == TYPE_FLOAT) {
                 return value.get<float>();
             }
-            if (type == "double") {
+            if (type == TYPE_DOUBLE) {
                 return value.get<double>();
             }
-            if (type == "string" || type == "std::string") {
+            if (type == TYPE_STRING) {
                 return value.get<std::string>();
             }
             // if (type == "any" || type == "std::any") {
             //     return j;
             // }
+
+            std::string type_s = type;
+            int l = type_s.size();
+            if (l > 2 && type_s.substr( l - 2, l) == "[]") {
+                if (type == TYPE_STRING_ARR) {
+                    auto vec = value.get<std::vector<std::string>>();
+                    std::string arr[vec.size()];
+                    for (int i = 0; i < vec.size(); ++i) {
+                        arr[i] = vec.at(i);
+                    }
+                    return *arr;
+                }
+            }
 
             return json_2_obj(value.dump(), type);
         }
@@ -291,8 +483,20 @@ namespace unitauto {
         return static_cast<std::any>(j);
     }
 
+    static std::map<std::string, void*> INSTANCE_MAP; // = {
+    //     {TYPE_BOOL, false},
+    //     {TYPE_CHAR, ''},
+    //     {TYPE_SHORT, static_cast<short>(1)},
+    //     {TYPE_INT, 1},
+    //     {TYPE_LONG, 0L},
+    //     {TYPE_LONG, 0L},
+    //     {TYPE_LONG, 0L},
+    //     {TYPE_LONG, 0L}
+    // };
+    // INSTANCE_MAP[TYPE_BOOL] = false;
+
     static void init() {
-        // TYPE_ID_MAP["int"] = typeid(0);
+        // TYPE_MAP[TYPE_INT] = typeid(0);
 
     }
 
@@ -533,7 +737,7 @@ namespace unitauto {
 
                 json ma;
                 try {
-                    auto type_cs = typeid(a).name();  // type_id.name();
+                    auto type_cs = typeid(a).name();  // TYPE.name();
                     std::string type(type_cs);
                     if (type_cs == 0 || type.empty()) {
                         ma["type"] = arg.type_name();
@@ -557,8 +761,8 @@ namespace unitauto {
 
             std::any ret = invoke(path, args);
 
-            // auto type_id = typeid(ret);
-            auto type_cs = typeid(ret).name();  // type_id.name();
+            // auto TYPE = typeid(ret);
+            auto type_cs = typeid(ret).name();  // TYPE.name();
             std::string type(type_cs);
 
             result["code"] = 200;
@@ -570,13 +774,13 @@ namespace unitauto {
             result["return"] = any_to_json(ret);
 
             // if (ret.has_value()) {
-            //     if (type_cs == TYPE_ID_BOOL) {
+            //     if (type_cs == TYPE_BOOL) {
             //         result["return"] = std::__convert_to_bool<>(ret); //  static_cast<int>(ret);
             //     }
-            //     else if (type_cs == TYPE_ID_INT) {
+            //     else if (type_cs == TYPE_INT) {
             //         result["return"] = std::to_integer(ret); //  static_cast<int>(ret);
             //     }
-            //     else if (type_cs == TYPE_ID_STR) {
+            //     else if (type_cs == TYPE_STR) {
             //         result["return"] = std::to_string(ret); //  static_cast<int>(ret);
             //     }
             // }

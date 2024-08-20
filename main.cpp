@@ -122,7 +122,7 @@ void to_json(json& j, const Person& p) {
     std::any ret = Person{"Alice", 30};
     auto type = typeid(ret).name();
 
-    unitauto::register_converter<Person>();
+    unitauto::register_cast<Person>();
 
     json result;
     result["code"] = 200;
@@ -145,9 +145,9 @@ int main() {
     unitauto::add_func("newMoment", std::function<Moment(long)>(newMoment));
 
     // 注册方法(成员函数)
-    Moment moment;
-    unitauto::add_func("setId", &moment, &Moment::setId);
-    unitauto::add_func("getId", &moment, &Moment::getId);
+    Moment moment(2);
+    unitauto::add_func("main.Moment.getId", &moment, &Moment::getId);
+    unitauto::add_func("main.Moment.setId", (Moment *) nullptr, &Moment::setId);
 
     // 执行函数
     try {
