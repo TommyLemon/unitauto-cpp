@@ -33,6 +33,7 @@ namespace unitauto {
     using json = nlohmann::json;
 
     static std::unordered_map<std::string, std::function<void*(const std::string&)>> TYPE_MAP;
+    static std::unordered_map<std::string, std::function<std::any(const std::string&)>> STRUCT_MAP;
 
     // 对象转 JSON 字符串
     // static std::string obj_2_json(const std::any& obj) {
@@ -43,6 +44,16 @@ namespace unitauto {
     static void* json_2_obj(const std::string& str, const std::string& type) {
         auto it = TYPE_MAP.find(type);
         if (it != TYPE_MAP.end()) {
+            return it->second(str);
+        }
+
+        throw std::runtime_error("Unknown type: "+ type + ", call add_type firstly!");
+    }
+
+    // JSON 字符串转对应类型的对象
+    static std::any json_2_any(const std::string& str, const std::string& type) {
+        auto it = STRUCT_MAP.find(type);
+        if (it != STRUCT_MAP.end()) {
             return it->second(str);
         }
 
@@ -82,6 +93,27 @@ namespace unitauto {
         TYPE_MAP.erase(type);
     }
 
+    // 注册类型
+    template<typename T>
+    static void add_struct(const std::string& type) {
+        // typeid(T).name() 会得到 4User 这种带了其它字符的名称
+        STRUCT_MAP[type] = [](const std::string& str) -> std::any {
+            if (str.empty()) {
+                T obj = T();
+                return std::any_cast<T>(obj);
+            }
+
+            json j = json::parse(str);
+            T obj = T(j.get<T>());
+            return std::any_cast<T>(obj);
+        };
+    }
+
+    // 取消注册类型
+    static void remove_struct(const std::string& type) {
+        STRUCT_MAP.erase(type);
+    }
+
 
     // 函数与方法(成员函数) <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -109,7 +141,7 @@ namespace unitauto {
         func(std::any_cast<Args>(args[I])...);
     }
 
-    // 执行非 void 方法(成员函数)
+    // 执行非 void 方法(成员函数)，针对 class 等的指针方式
     template<typename Ret, typename T, typename... Args, std::size_t... I>
     static std::any invoke(T *instance, Ret (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
         return (instance->*func)(std::any_cast<Args>(args[I])...);
@@ -120,6 +152,19 @@ namespace unitauto {
     static void invoke_void(T *instance, void (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
         (instance->*func)(std::any_cast<Args>(args[I])...);
     }
+
+    // 执行非 void 方法(成员函数)，针对 struct 等的值类型方式
+    template<typename Ret, typename T, typename... Args, std::size_t... I>
+    static std::any invoke_struct(T instance, Ret (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
+        return (instance.*func)(std::any_cast<Args>(args[I])...);
+    }
+
+    // 执行 void 方法(成员函数)
+    template<typename T, typename... Args, std::size_t... I>
+    static void invoke_struct_void(T instance, void (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
+        (instance.*func)(std::any_cast<Args>(args[I])...);
+    }
+
 
     // 注册函数
     template<typename Ret, typename... Args>
@@ -134,7 +179,7 @@ namespace unitauto {
         };
     }
 
-    // 注册方法(成员函数)
+    // 注册方法(成员函数)，针对 class 等的指针方式
     template<typename Ret, typename T, typename... Args>
     static void add_func(const std::string &name, T *instance, Ret (T::*func)(Args...)) {
         if (instance == nullptr) {
@@ -151,6 +196,19 @@ namespace unitauto {
                 return {};
             } else {
                 return invoke(instance, func, args, std::index_sequence_for<Args...>{});
+            }
+        };
+    }
+
+    // 注册方法(成员函数)，针对 struct 等的值类型方式
+    template<typename Ret, typename T, typename... Args>
+    static void add_func(const std::string &name, T instance, Ret (T::*func)(Args...)) {
+        FUNC_MAP[name] = [instance, func](std::vector<std::any> args) -> std::any {
+            if constexpr (std::is_void_v<Ret>) {
+                invoke_struct_void(instance, func, args, std::index_sequence_for<Args...>{});
+                return {};
+            } else {
+                return invoke_struct(instance, func, args, std::index_sequence_for<Args...>{});
             }
         };
     }
@@ -369,7 +427,7 @@ namespace unitauto {
             std::string vs = val.substr(ind + 1);
 
             if (type == TYPE_ANY) {
-                if (vs == "nullptr") {
+                if (vs == "nullptr") { // || vs == "null") {
                     return nullptr;
                 }
                 if (vs == "NULL") {
@@ -788,10 +846,13 @@ namespace unitauto {
     std::string get_type(std::any a) {
         auto type_cs = a.type().name(); // typeid(a).name();  // TYPE.name();
         std::string type(type_cs);
-        if (type_cs == 0 || type.empty()) {
+        if (type_cs == nullptr || type.empty()) {
             type = typeid(a.type()).name();
         }
 
+        if (type.empty() || type == "v") {
+            return "";
+        }
         if (type == "b") {
             return TYPE_BOOL;
         }
