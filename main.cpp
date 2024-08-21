@@ -231,6 +231,8 @@ int main() {
     unitauto::add_func("unitauto.test.divide", std::function<double(double,double)>(unitauto::test::divide));
     unitauto::add_func("unitauto.test.contains", std::function<bool(long[],long)>(unitauto::test::contains));
     unitauto::add_func("unitauto.test.index", std::function<int(std::string[],std::string)>(unitauto::test::index));
+    unitauto::add_func("unitauto.test.is_contain", std::function<bool(std::vector<int>,int)>(unitauto::test::is_contain));
+    unitauto::add_func("unitauto.test.index_of", std::function<int(std::vector<std::string>,std::string)>(unitauto::test::index_of));
 
     // 注册方法(成员函数)
     User user = User();

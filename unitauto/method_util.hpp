@@ -522,6 +522,7 @@ namespace unitauto {
                     for (int i = 0; i < vec.size(); ++i) {
                         arr[i] = vec.at(i);
                     }
+
                     return *arr;
                 }
 
@@ -551,16 +552,6 @@ namespace unitauto {
                     }
                     return *arr;
                 }
-
-                if (type == TYPE_INT_ARR) {
-                    auto vec = value.get<std::vector<int>>();
-                    int arr[vec.size()];
-                    for (int i = 0; i < vec.size(); ++i) {
-                        arr[i] = vec.at(i);
-                    }
-                    return *arr;
-                }
-
 
                 if (type == TYPE_INT_ARR) {
                     auto vec = value.get<std::vector<int>>();
@@ -616,6 +607,58 @@ namespace unitauto {
                     return *arr;
                 }
             }
+            else if (l > strlen("std::vector<")) { // && type_s.substr(0, strlen("std::vector<")) == "std::vector<") { // && type_s.find('<') < type_s.find_last_of('>')) {
+                if (type == "std::vector<bool>") {
+                    auto vec = value.get<std::vector<bool>>();
+                    return vec;
+                }
+
+                if (type == "std::vector<char>") {
+                    auto vec = value.get<std::vector<char>>();
+                    return vec;
+                }
+
+                if (type == "std::vector<std::byte>") {
+                    auto vec = value.get<std::vector<std::byte>>();
+                    return vec;
+                }
+
+                if (type == "std::vector<short>") {
+                    auto vec = value.get<std::vector<short>>();
+                    return vec;
+                }
+
+                if (type == "std::vector<int>") {
+                    auto vec = value.get<std::vector<int>>();
+                    return vec;
+                }
+
+                if (type == "std::vector<long>") {
+                    auto vec = value.get<std::vector<long>>();
+                    return vec;
+                }
+
+                if (type == "std::vector<long long>") {
+                    auto vec = value.get<std::vector<long long>>();
+                    return vec;
+                }
+
+                if (type == "std::vector<float>") {
+                    auto vec = value.get<std::vector<float>>();
+                    return vec;
+                }
+
+                if (type == "std::vector<double>") {
+                    auto vec = value.get<std::vector<double>>();
+                    return vec;
+                }
+
+                if (type_s == "std::vector<std::string>") {
+                    auto vec = value.get<std::vector<std::string>>();
+                    return vec;
+                }
+            }
+
 
             return json_2_obj(value.dump(), type);
         }

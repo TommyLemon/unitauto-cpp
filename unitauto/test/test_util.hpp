@@ -27,6 +27,20 @@ namespace unitauto::test {
           return false;
      }
 
+     static bool is_contain(std::vector<int> arr, int n) {
+          if (arr.empty()) {
+               return false;
+          }
+
+          for (int i = 0; i < arr.size(); ++i) {
+               if (arr[i] == n) {
+                    return true;
+               }
+          }
+
+          return false;
+     }
+
      static int index(std::string arr[], std::string s) {
           if (arr == nullptr || arr->length() <= 0) {
                return -1;
@@ -41,11 +55,26 @@ namespace unitauto::test {
           return -1;
      }
 
+     static int index_of(std::vector<std::string> arr, std::string s) {
+          if (arr.size() <= 0) {
+               return -1;
+          }
+
+          for (int i = 0; i < arr.size(); ++i) {
+               if (arr[i] == s) {
+                    return i;
+               }
+          }
+
+          return -1;
+     }
+
+
      class TestUtil {
      public:
           long id;
-          double divide(int a, int b) {
-               return a/b;
+          double divide(long a, long b) {
+               return 1.0f*a/b;
           }
 
           NLOHMANN_DEFINE_TYPE_INTRUSIVE(TestUtil, id)
