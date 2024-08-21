@@ -241,20 +241,36 @@ namespace unitauto {
 
 
     // 类型转换函数映射
-    static std::map<std::string, std::function<json(const std::any&)>> CAST_MAP;
+    // template<typename T >
+    static std::map<std::string, std::function<json(std::any)>> CAST_MAP;
 
     // 注册类型转换函数
     template<typename T>
-    void register_cast() {
-        CAST_MAP[typeid(T).name()] = [](std::any value) -> json {
-            return std::any_cast<T>(value);
+    void register_cast(std::string type) {
+        CAST_MAP[type] = [](std::any value) -> json {
+            try {
+                return std::any_cast<T>(value);
+            } catch (const std::exception& e) {
+                std::stringstream ss;
+                ss << &value;
+                json j;
+                j["type"] = value.type().name();
+                j["value"] = ss.str();
+                return j;
+            }
         };
+
+        std::string t = typeid(T).name();
+        if (t != type) {
+            CAST_MAP[t] = CAST_MAP[type];
+        }
     }
 
 
     // any_to_json 函数
     json _any_to_json(const std::any& value) {
-        auto it = CAST_MAP.find(value.type().name());
+        std::string type = value.type().name();
+        auto it = CAST_MAP.find(type);
         if (it != CAST_MAP.end()) {
             return it->second(value);
         }

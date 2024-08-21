@@ -117,6 +117,12 @@ Moment newMoment(long id) {
     return Moment(id);
 }
 
+User newUser(long id, std::string name) {
+    User u = User();
+    u.id = id;
+    u.setName(name);
+    return u;
+}
 
 
 // 自定义类型示例
@@ -146,7 +152,7 @@ void to_json(json& j, const Person& p) {
     std::any ret = Person{"Alice", 30};
     auto type = typeid(ret).name();
 
-    unitauto::register_cast<Person>();
+    // unitauto::register_cast<Person>("Person");
 
     // 执行函数
     try {
@@ -227,12 +233,27 @@ int main() {
     unitauto::add_func("print", std::function<void(const std::string &)>(print));
     unitauto::add_func("add", std::function<int(int, int)>(add));
     unitauto::add_func("divide", std::function<double(double, double)>(divide));
-    unitauto::add_func("newMoment", std::function<Moment(long)>(newMoment));
+    unitauto::add_func("main.newMoment", std::function<Moment(long)>(newMoment));
     unitauto::add_func("unitauto.test.divide", std::function<double(double,double)>(unitauto::test::divide));
     unitauto::add_func("unitauto.test.contains", std::function<bool(long[],long)>(unitauto::test::contains));
     unitauto::add_func("unitauto.test.index", std::function<int(std::string[],std::string)>(unitauto::test::index));
     unitauto::add_func("unitauto.test.is_contain", std::function<bool(std::vector<int>,int)>(unitauto::test::is_contain));
     unitauto::add_func("unitauto.test.index_of", std::function<int(std::vector<std::string>,std::string)>(unitauto::test::index_of));
+    unitauto::add_func("main.newUser", std::function<User(long, std::string)>(newUser));
+
+    unitauto::register_cast<Moment>("Moment");
+    unitauto::register_cast<User>("User");
+
+    // unitauto::CAST_MAP["Moment"] = [](std::any value) -> json {
+    //     std::stringstream ss;
+    //     ss << &value;
+    //     return ss.str();
+    // };
+    //
+    // unitauto::CAST_MAP["User"] = [](std::any value) -> json {
+    //     return value;
+    // };
+
 
     // 注册方法(成员函数)
     User user = User();
@@ -255,6 +276,7 @@ int main() {
     unitauto::add_func("main.Moment.getContent", (Moment *) nullptr, &Moment::getContent);
 
     // 必须先注册类型
+    unitauto::add_type<Moment>("Moment");
     unitauto::add_struct<User>("User");
     unitauto::add_type<unitauto::test::TestUtil>("unitauto.test.TestUtil");
 
