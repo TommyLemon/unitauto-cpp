@@ -125,26 +125,14 @@ User newUser(long id, std::string name) {
 }
 
 
+
 // 自定义类型示例
 struct Person {
     std::string name;
     int age;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(Person, name, age)
 };
-
-// 自定义类型的 to_json 函数
-void to_json(json& j, const Person& p) {
-    j = json{{"name", p.name}, {"age", p.age}};
-}
-
-// // 特化自定义类型的转换函数
-// template<>
-// void register_converter<Person>() {
-//     unitauto::converters[typeid(Person).name()] = [](std::any value) -> json {
-//         return std::any_cast<Person>(value);
-//     };
-// }
-//
-
 
 
  int test() {
@@ -152,7 +140,7 @@ void to_json(json& j, const Person& p) {
     std::any ret = Person{"Alice", 30};
     auto type = typeid(ret).name();
 
-    // unitauto::register_cast<Person>("Person");
+    unitauto::add_struct<Person>("Person");
 
     // 执行函数
     try {
@@ -209,7 +197,7 @@ void to_json(json& j, const Person& p) {
         std::cout << "  date: " << userPtr->date << std::endl;
         std::cout << "}" << userPtr->id << std::endl;
 
-        unitauto::del_obj<User>(obj);
+        // malloc: *** error for object 0x16cf96110: pointer being freed was not allocated unitauto::del_obj<User>(obj);
     } else {
         std::cerr << "Type match error, have u added type with add_type?" << std::endl;
     }
@@ -229,6 +217,11 @@ void to_json(json& j, const Person& p) {
 
 
 int main() {
+    // 必须先注册类型
+    unitauto::add_type<Moment>("Moment");
+    unitauto::add_struct<User>("User");
+    unitauto::add_type<unitauto::test::TestUtil>("unitauto.test.TestUtil");
+
     // 注册函数
     unitauto::add_func("print", std::function<void(const std::string &)>(print));
     unitauto::add_func("add", std::function<int(int, int)>(add));
@@ -240,20 +233,6 @@ int main() {
     unitauto::add_func("unitauto.test.is_contain", std::function<bool(std::vector<int>,int)>(unitauto::test::is_contain));
     unitauto::add_func("unitauto.test.index_of", std::function<int(std::vector<std::string>,std::string)>(unitauto::test::index_of));
     unitauto::add_func("main.newUser", std::function<User(long, std::string)>(newUser));
-
-    unitauto::register_cast<Moment>("Moment");
-    unitauto::register_cast<User>("User");
-
-    // unitauto::CAST_MAP["Moment"] = [](std::any value) -> json {
-    //     std::stringstream ss;
-    //     ss << &value;
-    //     return ss.str();
-    // };
-    //
-    // unitauto::CAST_MAP["User"] = [](std::any value) -> json {
-    //     return value;
-    // };
-
 
     // 注册方法(成员函数)
     User user = User();
@@ -274,11 +253,6 @@ int main() {
     unitauto::add_func("main.Moment.setId", (Moment *) nullptr, &Moment::setId);
     unitauto::add_func("main.Moment.setContent", (Moment *) nullptr, &Moment::setContent);
     unitauto::add_func("main.Moment.getContent", (Moment *) nullptr, &Moment::getContent);
-
-    // 必须先注册类型
-    unitauto::add_type<Moment>("Moment");
-    unitauto::add_struct<User>("User");
-    unitauto::add_type<unitauto::test::TestUtil>("unitauto.test.TestUtil");
 
     unitauto::add_func("unitauto.test.TestUtil.divide", (unitauto::test::TestUtil *) nullptr, &unitauto::test::TestUtil::divide);
 

@@ -32,6 +32,36 @@ limitations under the License.*/
 namespace unitauto {
     using json = nlohmann::json;
 
+    static std::map<std::string, std::string> TYEP_ALIAS_MAP;
+
+    // 类型转换函数映射
+    // template<typename T >
+    static std::map<std::string, std::function<json(std::any)>> CAST_MAP;
+
+    // 注册类型转换函数
+    template<typename T>
+    void add_cast(std::string type) {
+        CAST_MAP[type] = [](std::any value) -> json {
+            try {
+                return std::any_cast<T>(value);
+            } catch (const std::exception& e) {
+                std::stringstream ss;
+                ss << &value;
+                json j;
+                j["type"] = value.type().name();
+                j["value"] = ss.str();
+                return j;
+            }
+        };
+
+        std::string t = typeid(T).name();
+        if (t != type) {
+            CAST_MAP[t] = CAST_MAP[type];
+            TYEP_ALIAS_MAP[t] = type;
+            TYEP_ALIAS_MAP[type] = t;
+        }
+    }
+
     static std::unordered_map<std::string, std::function<void*(const std::string&)>> TYPE_MAP;
     static std::unordered_map<std::string, std::function<std::any(const std::string&)>> STRUCT_MAP;
 
@@ -43,6 +73,13 @@ namespace unitauto {
     // JSON 字符串转对应类型的对象
     static void* json_2_obj(const std::string& str, const std::string& type) {
         auto it = TYPE_MAP.find(type);
+        if (it == TYPE_MAP.end()) {
+            std::string t = TYEP_ALIAS_MAP[type];
+            if (t != type && ! t.empty()) {
+                it = TYPE_MAP.find(t);
+            }
+        }
+
         if (it != TYPE_MAP.end()) {
             return it->second(str);
         }
@@ -53,6 +90,13 @@ namespace unitauto {
     // JSON 字符串转对应类型的对象
     static std::any json_2_any(const std::string& str, const std::string& type) {
         auto it = STRUCT_MAP.find(type);
+        if (it == STRUCT_MAP.end()) {
+            std::string t = TYEP_ALIAS_MAP[type];
+            if (t != type && ! t.empty()) {
+                it = STRUCT_MAP.find(t);
+            }
+        }
+
         if (it != STRUCT_MAP.end()) {
             return it->second(str);
         }
@@ -69,7 +113,11 @@ namespace unitauto {
     // 删除对象
     template<typename T>
     static void del_obj(void* obj) {
-        delete static_cast<T*>(obj);
+        try {
+            delete static_cast<T*>(obj);
+        } catch (const std::exception& e) {
+            std::cout << e.what() << std::endl;
+        }
     }
 
     // 注册类型
@@ -86,6 +134,32 @@ namespace unitauto {
             T* obj = new T(j.get<T>());
             return static_cast<void*>(obj);
         };
+
+        std::string t = typeid(T).name();
+        if (t != type) {
+            TYPE_MAP[t] = TYPE_MAP[type];
+            TYEP_ALIAS_MAP[t] = type;
+            TYEP_ALIAS_MAP[type] = t;
+        }
+
+        // cannot infer T to T  add_cast(type);
+
+        CAST_MAP[type] = [](std::any value) -> json {
+            try {
+                return std::any_cast<T>(value);
+            } catch (const std::exception& e) {
+                std::stringstream ss;
+                ss << &value;
+                json j;
+                j["type"] = value.type().name();
+                j["value"] = ss.str();
+                return j;
+            }
+        };
+
+        if (t != type) {
+            CAST_MAP[t] = CAST_MAP[type];
+        }
     }
 
     // 取消注册类型
@@ -107,6 +181,45 @@ namespace unitauto {
             T obj = T(j.get<T>());
             return std::any_cast<T>(obj);
         };
+
+        std::string t = typeid(T).name();
+        if (t != type) {
+            STRUCT_MAP[t] = STRUCT_MAP[type];
+            TYEP_ALIAS_MAP[t] = type;
+            TYEP_ALIAS_MAP[type] = t;
+        }
+
+        TYPE_MAP[type] = [](const std::string& str) -> void* {
+            if (str.empty()) {
+                T obj = T();
+                return &obj;
+            }
+
+            json j = json::parse(str);
+            T obj = T(j.get<T>());
+            return &obj;
+        };
+
+        if (t != type) {
+            TYPE_MAP[t] = TYPE_MAP[type];
+        }
+
+        CAST_MAP[type] = [](std::any value) -> json {
+            try {
+                return std::any_cast<T>(value);
+            } catch (const std::exception& e) {
+                std::stringstream ss;
+                ss << &value;
+                json j;
+                j["type"] = value.type().name();
+                j["value"] = ss.str();
+                return j;
+            }
+        };
+
+        if (t != type) {
+            CAST_MAP[t] = CAST_MAP[type];
+        }
     }
 
     // 取消注册类型
@@ -240,37 +353,18 @@ namespace unitauto {
     static const std::string TYPE_STRING_ARR = "std::string[]"; // typeid(std::string).name();
 
 
-    // 类型转换函数映射
-    // template<typename T >
-    static std::map<std::string, std::function<json(std::any)>> CAST_MAP;
-
-    // 注册类型转换函数
-    template<typename T>
-    void register_cast(std::string type) {
-        CAST_MAP[type] = [](std::any value) -> json {
-            try {
-                return std::any_cast<T>(value);
-            } catch (const std::exception& e) {
-                std::stringstream ss;
-                ss << &value;
-                json j;
-                j["type"] = value.type().name();
-                j["value"] = ss.str();
-                return j;
-            }
-        };
-
-        std::string t = typeid(T).name();
-        if (t != type) {
-            CAST_MAP[t] = CAST_MAP[type];
-        }
-    }
-
 
     // any_to_json 函数
     json _any_to_json(const std::any& value) {
         std::string type = value.type().name();
         auto it = CAST_MAP.find(type);
+        if (it == CAST_MAP.end()) {
+            std::string t = TYEP_ALIAS_MAP[type];
+            if (t != type && ! t.empty()) {
+                it = CAST_MAP.find(t);
+            }
+        }
+
         if (it != CAST_MAP.end()) {
             return it->second(value);
         }
@@ -485,7 +579,11 @@ namespace unitauto {
                 return vs;
             }
 
-            return json_2_obj(vs, type);
+            try {
+                return json_2_obj(vs, type);
+            } catch (const std::exception& e) {
+                return json_2_any(vs, type);
+            }
         }
 
         if (j.is_object()) {
@@ -675,8 +773,11 @@ namespace unitauto {
                 }
             }
 
-
-            return json_2_obj(value.dump(), type);
+            try {
+                return json_2_obj(value.dump(), type);
+            } catch (const std::exception& e) {
+                return json_2_any(value.dump(), type);
+            }
         }
 
         if (j.is_array()) {
@@ -932,6 +1033,15 @@ namespace unitauto {
         }
         if (type == "d") {
             return TYPE_DOUBLE;
+        }
+
+        while (! type.empty()) {
+            char c = type.at(0);
+            if (c >= '0' && c <= '9') {
+                type = type.substr(1);
+            } else {
+                break;
+            }
         }
 
         return type;
