@@ -32,6 +32,74 @@ limitations under the License.*/
 namespace unitauto {
     using json = nlohmann::json;
 
+    static const std::string TYPE_ANY = "std::any"; // typeid(bool).name();
+    static const std::string TYPE_BOOL = "bool"; // typeid(bool).name();
+    static const std::string TYPE_CHAR = "char"; // typeid(char).name();
+    static const std::string TYPE_BYTE = "std::byte"; // typeid(std::byte).name();
+    static const std::string TYPE_SHORT = "short"; // typeid(bool).name();
+    static const std::string TYPE_INT = "int"; // typeid(int).name();
+    static const std::string TYPE_LONG = "long"; // typeid(long).name();
+    static const std::string TYPE_LONG_LONG = "long long"; // typeid(long).name();
+    static const std::string TYPE_FLOAT = "float"; // typeid(float).name();
+    static const std::string TYPE_DOUBLE = "double"; // typeid(double).name();
+    static const std::string TYPE_STRING = "std::string"; // typeid(std::string).name();
+    // static const auto TYPE_ARR = typeid(std::array).name();
+    static const std::string TYPE_ANY_ARR = "std::any[]"; // typeid(bool).name();
+    static const std::string TYPE_BOOL_ARR = "bool[]"; // typeid(bool).name();
+    static const std::string TYPE_CHAR_ARR = "char[]"; // typeid(char).name();
+    static const std::string TYPE_BYTE_ARR = "std::byte[]"; // typeid(std::byte).name();
+    static const std::string TYPE_SHORT_ARR = "short[]"; // typeid(bool).name();
+    static const std::string TYPE_INT_ARR = "int[]"; // typeid(int).name();
+    static const std::string TYPE_LONG_ARR = "long[]"; // typeid(long).name();
+    static const std::string TYPE_LONG_LONG_ARR = "long long[]"; // typeid(long).name();
+    static const std::string TYPE_FLOAT_ARR = "float[]"; // typeid(float).name();
+    static const std::string TYPE_DOUBLE_ARR = "double[]"; // typeid(double).name();
+    static const std::string TYPE_STRING_ARR = "std::string[]"; // typeid(std::string).name();
+
+    std::string get_type(std::any a) {
+        auto type_cs = a.type().name(); // typeid(a).name();  // TYPE.name();
+        std::string type(type_cs);
+        if (type_cs == nullptr || type.empty()) {
+            type = typeid(a.type()).name();
+        }
+
+        if (type.empty() || type == "v") {
+            return "";
+        }
+        if (type == "b") {
+            return TYPE_BOOL;
+        }
+        if (type == "c") {
+            return TYPE_CHAR;
+        }
+        if (type == "i") {
+            return TYPE_INT;
+        }
+        if (type == "l") {
+            return TYPE_LONG;
+        }
+        if (type == "ll") {
+            return TYPE_LONG_LONG;
+        }
+        if (type == "f") {
+            return TYPE_FLOAT;
+        }
+        if (type == "d") {
+            return TYPE_DOUBLE;
+        }
+
+        while (! type.empty()) {
+            char c = type.at(0);
+            if (c >= '0' && c <= '9') {
+                type = type.substr(1);
+            } else {
+                break;
+            }
+        }
+
+        return type;
+    }
+
     static std::map<std::string, std::string> TYEP_ALIAS_MAP;
 
     // 类型转换函数映射
@@ -62,8 +130,8 @@ namespace unitauto {
         }
     }
 
-    static std::unordered_map<std::string, std::function<void*(const std::string&)>> TYPE_MAP;
-    static std::unordered_map<std::string, std::function<std::any(const std::string&)>> STRUCT_MAP;
+    static std::unordered_map<std::string, std::function<void*(json &j)>> TYPE_MAP;
+    static std::unordered_map<std::string, std::function<std::any(json &j)>> STRUCT_MAP;
 
     // 对象转 JSON 字符串
     // static std::string obj_2_json(const std::any& obj) {
@@ -71,7 +139,7 @@ namespace unitauto {
     // }
 
     // JSON 字符串转对应类型的对象
-    static void* json_2_obj(const std::string& str, const std::string& type) {
+    static void* json_2_obj(json &j, const std::string& type) {
         auto it = TYPE_MAP.find(type);
         if (it == TYPE_MAP.end()) {
             std::string t = TYEP_ALIAS_MAP[type];
@@ -81,14 +149,21 @@ namespace unitauto {
         }
 
         if (it != TYPE_MAP.end()) {
-            return it->second(str);
+            return it->second(j);
         }
 
         throw std::runtime_error("Unknown type: "+ type + ", call add_type firstly!");
     }
 
+
+    // 对象转对象
+    // static void* obj_2_obj(const std::any& obj, const std::string& type) {
+    //     auto str = obj_2_json(obj);
+    //     return json_2_obj(str, type);
+    // }
+
     // JSON 字符串转对应类型的对象
-    static std::any json_2_any(const std::string& str, const std::string& type) {
+    static std::any json_2_any(json &j, const std::string& type) {
         auto it = STRUCT_MAP.find(type);
         if (it == STRUCT_MAP.end()) {
             std::string t = TYEP_ALIAS_MAP[type];
@@ -98,261 +173,11 @@ namespace unitauto {
         }
 
         if (it != STRUCT_MAP.end()) {
-            return it->second(str);
+            return it->second(j);
         }
 
         throw std::runtime_error("Unknown type: "+ type + ", call add_type firstly!");
     }
-
-    // 对象转对象
-    // static void* obj_2_obj(const std::any& obj, const std::string& type) {
-    //     auto str = obj_2_json(obj);
-    //     return json_2_obj(str, type);
-    // }
-
-    // 删除对象
-    template<typename T>
-    static void del_obj(void* obj) {
-        try {
-            delete static_cast<T*>(obj);
-        } catch (const std::exception& e) {
-            std::cout << e.what() << std::endl;
-        }
-    }
-
-    // 注册类型
-    template<typename T>
-    static void add_type(const std::string& type) {
-        // typeid(T).name() 会得到 4User 这种带了其它字符的名称
-        TYPE_MAP[type] = [](const std::string& str) -> void* {
-            if (str.empty()) {
-                T* obj = new T();
-                return static_cast<void*>(obj);
-            }
-
-            json j = json::parse(str);
-            T* obj = new T(j.get<T>());
-            return static_cast<void*>(obj);
-        };
-
-        std::string t = typeid(T).name();
-        if (t != type) {
-            TYPE_MAP[t] = TYPE_MAP[type];
-            TYEP_ALIAS_MAP[t] = type;
-            TYEP_ALIAS_MAP[type] = t;
-        }
-
-        // cannot infer T to T  add_cast(type);
-
-        CAST_MAP[type] = [](std::any value) -> json {
-            try {
-                return std::any_cast<T>(value);
-            } catch (const std::exception& e) {
-                std::stringstream ss;
-                ss << &value;
-                json j;
-                j["type"] = value.type().name();
-                j["value"] = ss.str();
-                return j;
-            }
-        };
-
-        if (t != type) {
-            CAST_MAP[t] = CAST_MAP[type];
-        }
-    }
-
-    // 取消注册类型
-    static void remove_type(const std::string& type) {
-        TYPE_MAP.erase(type);
-    }
-
-    // 注册类型
-    template<typename T>
-    static void add_struct(const std::string& type) {
-        // typeid(T).name() 会得到 4User 这种带了其它字符的名称
-        STRUCT_MAP[type] = [](const std::string& str) -> std::any {
-            if (str.empty()) {
-                T obj = T();
-                return std::any_cast<T>(obj);
-            }
-
-            json j = json::parse(str);
-            T obj = T(j.get<T>());
-            return std::any_cast<T>(obj);
-        };
-
-        std::string t = typeid(T).name();
-        if (t != type) {
-            STRUCT_MAP[t] = STRUCT_MAP[type];
-            TYEP_ALIAS_MAP[t] = type;
-            TYEP_ALIAS_MAP[type] = t;
-        }
-
-        TYPE_MAP[type] = [](const std::string& str) -> void* {
-            if (str.empty()) {
-                T obj = T();
-                return &obj;
-            }
-
-            json j = json::parse(str);
-            T obj = T(j.get<T>());
-            return &obj;
-        };
-
-        if (t != type) {
-            TYPE_MAP[t] = TYPE_MAP[type];
-        }
-
-        CAST_MAP[type] = [](std::any value) -> json {
-            try {
-                return std::any_cast<T>(value);
-            } catch (const std::exception& e) {
-                std::stringstream ss;
-                ss << &value;
-                json j;
-                j["type"] = value.type().name();
-                j["value"] = ss.str();
-                return j;
-            }
-        };
-
-        if (t != type) {
-            CAST_MAP[t] = CAST_MAP[type];
-        }
-    }
-
-    // 取消注册类型
-    static void remove_struct(const std::string& type) {
-        STRUCT_MAP.erase(type);
-    }
-
-
-    // 函数与方法(成员函数) <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-    using FT = std::function<std::any(std::vector<std::any>)>;
-    static std::map<std::string, FT> FUNC_MAP;
-
-    // 执行已注册的函数/方法(成员函数)
-    static std::any invoke(const std::string &name, std::vector<std::any> args) {
-        auto it = FUNC_MAP.find(name);
-        if (it != FUNC_MAP.end()) {
-            return it->second(args);
-        }
-        throw std::runtime_error("Unkown func: " + name + ", call add_func firstly!");
-    }
-
-    // 执行非 void 函数
-    template<typename Ret, typename... Args, std::size_t... I>
-    static std::any invoke(std::function<Ret(Args...)> func, std::vector<std::any> &args, std::index_sequence<I...>) {
-        return func(std::any_cast<Args>(args[I])...);
-    }
-
-    // 执行 void 函数
-    template<typename... Args, std::size_t... I>
-    static void invoke_void(std::function<void(Args...)> func, std::vector<std::any> &args, std::index_sequence<I...>) {
-        func(std::any_cast<Args>(args[I])...);
-    }
-
-    // 执行非 void 方法(成员函数)，针对 class 等的指针方式
-    template<typename Ret, typename T, typename... Args, std::size_t... I>
-    static std::any invoke(T *instance, Ret (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
-        return (instance->*func)(std::any_cast<Args>(args[I])...);
-    }
-
-    // 执行 void 方法(成员函数)
-    template<typename T, typename... Args, std::size_t... I>
-    static void invoke_void(T *instance, void (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
-        (instance->*func)(std::any_cast<Args>(args[I])...);
-    }
-
-    // 执行非 void 方法(成员函数)，针对 struct 等的值类型方式
-    template<typename Ret, typename T, typename... Args, std::size_t... I>
-    static std::any invoke_struct(T instance, Ret (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
-        return (instance.*func)(std::any_cast<Args>(args[I])...);
-    }
-
-    // 执行 void 方法(成员函数)
-    template<typename T, typename... Args, std::size_t... I>
-    static void invoke_struct_void(T instance, void (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
-        (instance.*func)(std::any_cast<Args>(args[I])...);
-    }
-
-
-    // 注册函数
-    template<typename Ret, typename... Args>
-    static void add_func(const std::string &name, std::function<Ret(Args...)> func) {
-        FUNC_MAP[name] = [func](std::vector<std::any> args) -> std::any {
-            if constexpr (std::is_void_v<Ret>) {
-                invoke_void(func, args, std::index_sequence_for<Args...>{});
-                return {};
-            } else {
-                return invoke(func, args, std::index_sequence_for<Args...>{});
-            }
-        };
-    }
-
-    // 注册方法(成员函数)，针对 class 等的指针方式
-    template<typename Ret, typename T, typename... Args>
-    static void add_func(const std::string &name, T *instance, Ret (T::*func)(Args...)) {
-        if (instance == nullptr) {
-            // instance = json_2_obj("", typeid(T).name());
-
-            if (instance == nullptr) {
-                instance = new T();
-            }
-        }
-
-        FUNC_MAP[name] = [instance, func](std::vector<std::any> args) -> std::any {
-            if constexpr (std::is_void_v<Ret>) {
-                invoke_void(instance, func, args, std::index_sequence_for<Args...>{});
-                return {};
-            } else {
-                return invoke(instance, func, args, std::index_sequence_for<Args...>{});
-            }
-        };
-    }
-
-    // 注册方法(成员函数)，针对 struct 等的值类型方式
-    template<typename Ret, typename T, typename... Args>
-    static void add_func(const std::string &name, T instance, Ret (T::*func)(Args...)) {
-        FUNC_MAP[name] = [instance, func](std::vector<std::any> args) -> std::any {
-            if constexpr (std::is_void_v<Ret>) {
-                invoke_struct_void(instance, func, args, std::index_sequence_for<Args...>{});
-                return {};
-            } else {
-                return invoke_struct(instance, func, args, std::index_sequence_for<Args...>{});
-            }
-        };
-    }
-
-    // 函数与方法(成员函数) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-    static const std::string TYPE_ANY = "std::any"; // typeid(bool).name();
-    static const std::string TYPE_BOOL = "bool"; // typeid(bool).name();
-    static const std::string TYPE_CHAR = "char"; // typeid(char).name();
-    static const std::string TYPE_BYTE = "std::byte"; // typeid(std::byte).name();
-    static const std::string TYPE_SHORT = "short"; // typeid(bool).name();
-    static const std::string TYPE_INT = "int"; // typeid(int).name();
-    static const std::string TYPE_LONG = "long"; // typeid(long).name();
-    static const std::string TYPE_LONG_LONG = "long long"; // typeid(long).name();
-    static const std::string TYPE_FLOAT = "float"; // typeid(float).name();
-    static const std::string TYPE_DOUBLE = "double"; // typeid(double).name();
-    static const std::string TYPE_STRING = "std::string"; // typeid(std::string).name();
-    // static const auto TYPE_ARR = typeid(std::array).name();
-    static const std::string TYPE_ANY_ARR = "std::any[]"; // typeid(bool).name();
-    static const std::string TYPE_BOOL_ARR = "bool[]"; // typeid(bool).name();
-    static const std::string TYPE_CHAR_ARR = "char[]"; // typeid(char).name();
-    static const std::string TYPE_BYTE_ARR = "std::byte[]"; // typeid(std::byte).name();
-    static const std::string TYPE_SHORT_ARR = "short[]"; // typeid(bool).name();
-    static const std::string TYPE_INT_ARR = "int[]"; // typeid(int).name();
-    static const std::string TYPE_LONG_ARR = "long[]"; // typeid(long).name();
-    static const std::string TYPE_LONG_LONG_ARR = "long long[]"; // typeid(long).name();
-    static const std::string TYPE_FLOAT_ARR = "float[]"; // typeid(float).name();
-    static const std::string TYPE_DOUBLE_ARR = "double[]"; // typeid(double).name();
-    static const std::string TYPE_STRING_ARR = "std::string[]"; // typeid(std::string).name();
-
-
 
     // any_to_json 函数
     json _any_to_json(const std::any& value) {
@@ -369,11 +194,23 @@ namespace unitauto {
             return it->second(value);
         }
 
-        return (json&) value;
+        std::stringstream ss;
+        ss << &value;
+        json j;
+        j["type"] = value.type().name();
+        j["value"] = ss.str();
+
+        return j; // (json&) value;
     }
 
     // any_to_json 函数模板
     json any_to_json(const std::any& value) {
+        if (! value.has_value()) {
+            json j;
+            return j;
+            // return nullptr;
+        }
+
         try {
             if (value.type() == typeid(bool)) {
                 return std::any_cast<bool>(value);
@@ -505,7 +342,7 @@ namespace unitauto {
         return _any_to_json(value);
     }
 
-    static std::any json_to_any(json j) {
+    static std::any json_to_any(json &j) {
         if (j.is_null()) {
             return nullptr;
         }
@@ -579,10 +416,11 @@ namespace unitauto {
                 return vs;
             }
 
+            json j = vs;
             try {
-                return json_2_obj(vs, type);
+                return json_2_obj(j, type);
             } catch (const std::exception& e) {
-                return json_2_any(vs, type);
+                return json_2_any(j, type);
             }
         }
 
@@ -774,9 +612,9 @@ namespace unitauto {
             }
 
             try {
-                return json_2_obj(value.dump(), type);
+                return json_2_obj(value, type);
             } catch (const std::exception& e) {
-                return json_2_any(value.dump(), type);
+                return json_2_any(value, type);
             }
         }
 
@@ -791,6 +629,231 @@ namespace unitauto {
 
         return static_cast<std::any>(j);
     }
+
+
+    // 删除对象
+    template<typename T>
+    static void del_obj(void* obj) {
+        try {
+            delete static_cast<T*>(obj);
+        } catch (const std::exception& e) {
+            std::cout << e.what() << std::endl;
+        }
+    }
+
+    template<typename T>
+    T INSTANCE_GETTER(json &j) {
+        if (j.empty()) {
+            T obj = T();
+            return obj;
+        }
+
+        T obj = T(j.get<T>());
+        return obj;
+    };
+
+    template<typename T>
+    T* INSTANCE_PTR_GETTER(json &j) {
+        if (j.empty()) {
+            T* obj = new T();
+            return obj;
+        }
+
+        T* obj = new T(j.get<T>());
+        return obj;
+    };
+
+    // 注册类型
+    template<typename T>
+    static void add_type(const std::string& type, T callback(json& j)) {
+        // typeid(T).name() 会得到 4User 这种带了其它字符的名称
+        TYPE_MAP[type] = [callback](json& j) -> void* {
+            // if (callback == nullptr) {
+            //     callback = INSTANCE_GETTER<T>;
+            // }
+            auto obj = callback != nullptr ? callback(j) : INSTANCE_GETTER<T>(j);
+            auto p = &obj;
+            return static_cast<void*>(p);
+        };
+
+        std::string t = typeid(T).name();
+        if (t != type) {
+            TYPE_MAP[t] = TYPE_MAP[type];
+            TYEP_ALIAS_MAP[t] = type;
+            TYEP_ALIAS_MAP[type] = t;
+        }
+
+        add_cast<T>(type);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_type(const std::string& type) {
+        add_type<T>(type, nullptr);
+    }
+
+
+    // 取消注册类型
+    static void remove_type(const std::string& type) {
+        TYPE_MAP.erase(type);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_struct(const std::string& type) {
+        // typeid(T).name() 会得到 4User 这种带了其它字符的名称
+        STRUCT_MAP[type] = [](json &j) -> std::any {
+            if (j.empty()) {
+                T obj = T();
+                return std::any_cast<T>(obj);
+            }
+
+            T obj = T(j.get<T>());
+            return std::any_cast<T>(obj);
+        };
+
+        std::string t = typeid(T).name();
+        if (t != type) {
+            STRUCT_MAP[t] = STRUCT_MAP[type];
+            TYEP_ALIAS_MAP[t] = type;
+            TYEP_ALIAS_MAP[type] = t;
+        }
+
+        add_type<T>(type);
+    }
+
+    // 取消注册类型
+    static void remove_struct(const std::string& type) {
+        STRUCT_MAP.erase(type);
+    }
+
+
+    // 函数与方法(成员函数) <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+    using FT = std::function<std::any(json &j, std::vector<std::any>)>;
+    static std::map<std::string, FT> FUNC_MAP;
+
+    // 执行已注册的函数/方法(成员函数)
+    static std::any invoke(const std::string &name, std::vector<std::any> args) {
+        auto it = FUNC_MAP.find(name);
+        if (it != FUNC_MAP.end()) {
+            json j;
+            return it->second(j, args);
+        }
+        throw std::runtime_error("Unkown func: " + name + ", call add_func firstly!");
+    }
+
+    // 执行已注册的函数/方法(成员函数)
+    static std::any invoke_method(json &thiz, const std::string &name, std::vector<std::any> args) {
+        json type = thiz["type"];
+        json value = thiz["value"];
+        if (! type.empty()) {
+            auto it = TYPE_MAP.find(type.get<std::string>());
+            if (it != TYPE_MAP.end()) {
+                it->second(value);
+            }
+        }
+
+        auto it = FUNC_MAP.find(name);
+        if (it != FUNC_MAP.end()) {
+            return it->second(value, args);
+        }
+        throw std::runtime_error("Unkown func: " + name + ", call add_func firstly!");
+    }
+
+    // 执行非 void 函数
+    template<typename Ret, typename... Args, std::size_t... I>
+    static std::any invoke(std::function<Ret(Args...)> func, std::vector<std::any> &args, std::index_sequence<I...>) {
+        return func(std::any_cast<Args>(args[I])...);
+    }
+
+    // 执行 void 函数
+    template<typename... Args, std::size_t... I>
+    static void invoke_void(std::function<void(Args...)> func, std::vector<std::any> &args, std::index_sequence<I...>) {
+        func(std::any_cast<Args>(args[I])...);
+    }
+
+    // 执行非 void 方法(成员函数)，针对 class 等的指针方式
+    template<typename Ret, typename T, typename... Args, std::size_t... I>
+    static std::any invoke(T *instance, Ret (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
+        return (instance->*func)(std::any_cast<Args>(args[I])...);
+    }
+
+    // 执行 void 方法(成员函数)
+    template<typename T, typename... Args, std::size_t... I>
+    static void invoke_void(T *instance, void (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
+        (instance->*func)(std::any_cast<Args>(args[I])...);
+    }
+
+    // 执行非 void 方法(成员函数)，针对 struct 等的值类型方式
+    template<typename Ret, typename T, typename... Args, std::size_t... I>
+    static std::any invoke_struct(T instance, Ret (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
+        return (instance.*func)(std::any_cast<Args>(args[I])...);
+    }
+
+    // 执行 void 方法(成员函数)
+    template<typename T, typename... Args, std::size_t... I>
+    static void invoke_struct_void(T instance, void (T::*func)(Args...), std::vector<std::any> &args, std::index_sequence<I...>) {
+        (instance.*func)(std::any_cast<Args>(args[I])...);
+    }
+
+
+    // 注册函数
+    template<typename Ret, typename... Args>
+    static void add_func(const std::string &name, std::function<Ret(Args...)> func) {
+        FUNC_MAP[name] = [func](json &j, std::vector<std::any> args) -> std::any {
+            if constexpr (std::is_void_v<Ret>) {
+                invoke_void(func, args, std::index_sequence_for<Args...>{});
+                return nullptr;
+            } else {
+                return invoke(func, args, std::index_sequence_for<Args...>{});
+            }
+        };
+    }
+
+    // 注册方法(成员函数)，针对 class 等的指针方式
+    template<typename Ret, typename T, typename... Args>
+    static void add_func(const std::string &name, T *instance, Ret (T::*func)(Args...)) {
+        FUNC_MAP[name] = [&instance, func](json &j, std::vector<std::any> args) -> std::any {
+            if (! j.empty() || instance == nullptr) {
+                auto ins = INSTANCE_GETTER<T>(j); // static_cast<T>(ins);
+                instance = &ins;
+            }
+
+            std::any ret = nullptr;
+            if constexpr (std::is_void_v<Ret>) {
+                invoke_void(instance, func, args, std::index_sequence_for<Args...>{});
+            } else {
+                ret = invoke(instance, func, args, std::index_sequence_for<Args...>{});
+            }
+
+            if (! j.empty()) {
+                j["type"] = get_type(instance);
+                j["value"] = any_to_json(instance);
+            }
+
+            return ret;
+        };
+    }
+
+    // 注册方法(成员函数)，针对 struct 等的值类型方式
+    template<typename Ret, typename T, typename... Args>
+    static void add_func(const std::string &name, T instance, Ret (T::*func)(Args...)) {
+        FUNC_MAP[name] = [instance, func](json &j, std::vector<std::any> args) -> std::any {
+            // if (! j.empty()) {
+            //     j.get_to(instance);
+            // }
+
+            if constexpr (std::is_void_v<Ret>) {
+                invoke_struct_void(instance, func, args, std::index_sequence_for<Args...>{});
+                return nullptr;
+            } else {
+                return invoke_struct(instance, func, args, std::index_sequence_for<Args...>{});
+            }
+        };
+    }
+
+    // 函数与方法(成员函数) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     static std::map<std::string, void*> INSTANCE_MAP; // = {
     //     {TYPE_BOOL, false},
@@ -1003,49 +1066,6 @@ namespace unitauto {
         return result;
     }
 
-    std::string get_type(std::any a) {
-        auto type_cs = a.type().name(); // typeid(a).name();  // TYPE.name();
-        std::string type(type_cs);
-        if (type_cs == nullptr || type.empty()) {
-            type = typeid(a.type()).name();
-        }
-
-        if (type.empty() || type == "v") {
-            return "";
-        }
-        if (type == "b") {
-            return TYPE_BOOL;
-        }
-        if (type == "c") {
-            return TYPE_CHAR;
-        }
-        if (type == "i") {
-            return TYPE_INT;
-        }
-        if (type == "l") {
-            return TYPE_LONG;
-        }
-        if (type == "ll") {
-            return TYPE_LONG_LONG;
-        }
-        if (type == "f") {
-            return TYPE_FLOAT;
-        }
-        if (type == "d") {
-            return TYPE_DOUBLE;
-        }
-
-        while (! type.empty()) {
-            char c = type.at(0);
-            if (c >= '0' && c <= '9') {
-                type = type.substr(1);
-            } else {
-                break;
-            }
-        }
-
-        return type;
-    }
 
     static nlohmann::json invoke_json(nlohmann::json j) {
         nlohmann::json result;
@@ -1054,11 +1074,8 @@ namespace unitauto {
             json method = j["method"];
             std::string mtd = method.empty() ? "" : method.get<std::string>();
             if (mtd.empty()) {
-                throw "method cannot be empty! should be a string!";
+                throw std::runtime_error("method cannot be empty! should be a string!");
             }
-
-            json is_static = j["static"];
-            bool is_sttc = is_static.empty() ? false : is_static.get<bool>();
 
             json package = j["package"];
             std::string pkg = package.empty() ? "" : package.get<std::string>();
@@ -1072,6 +1089,26 @@ namespace unitauto {
             }
             if (! pkg.empty()) {
                 path = pkg + "." + path;
+            }
+
+            json clsArgs = j["classArgs"];
+
+            json thiz = j["this"];
+
+            json is_static = j["static"];
+            bool is_sttc = is_static.empty() ? thiz.empty() && clsArgs.empty() && (cls.empty() || cls.at(0) < 'A' || cls.at(0) > 'Z') : is_static.get<bool>();
+
+            if (! is_sttc) {
+                json tt = thiz["type"];
+                if (tt.empty()) {
+                    thiz["type"] = tt = (pkg.empty() ? "" : pkg + ".") + cls;
+                }
+
+                std::string type = tt.get<std::string>();
+                json value = thiz["value"];
+                // this_ = json_2_obj(value, type);
+            } else if (! (thiz.empty() && clsArgs.empty())) {
+                throw std::runtime_error("static: true 时，this 和 classArgs 都必须不传或为空！");
             }
 
             nlohmann::json args_ = j["args"];
@@ -1107,7 +1144,7 @@ namespace unitauto {
                 methodArgs.push_back(ma);
             }
 
-            std::any ret = invoke(path, args);
+            std::any ret = invoke_method(thiz, path, args);
             std::string type = get_type(ret);
 
             result["code"] = 200;
@@ -1115,21 +1152,13 @@ namespace unitauto {
             if (! type.empty()) {
                 result["type"] = type;  // type_cs;
             }
+            if (ret.has_value()) {
+                result["return"] = any_to_json(ret);
+            }
 
-            result["return"] = any_to_json(ret);
-
-            // if (ret.has_value()) {
-            //     if (type_cs == TYPE_BOOL) {
-            //         result["return"] = std::__convert_to_bool<>(ret); //  static_cast<int>(ret);
-            //     }
-            //     else if (type_cs == TYPE_INT) {
-            //         result["return"] = std::to_integer(ret); //  static_cast<int>(ret);
-            //     }
-            //     else if (type_cs == TYPE_STR) {
-            //         result["return"] = std::to_string(ret); //  static_cast<int>(ret);
-            //     }
-            // }
-
+            if (! is_sttc) {
+                result["this"] = any_to_json(thiz);
+            }
 
             result["methodArgs"] = methodArgs; // any_to_json(args);
         } catch (const std::exception& e) {

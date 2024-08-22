@@ -153,13 +153,14 @@ struct Person {
         auto divideRet = unitauto::invoke("divide", {5.6, static_cast<double>(3)});
         std::cout << "invoke(\"divide\", {5.6, 3}) = " << std::any_cast<double>(divideRet) << std::endl;
 
-        auto moment2Ret = unitauto::invoke("newMoment", {12L});
+        auto moment2Ret = unitauto::invoke("main.newMoment", {12L});
         Moment moment2 = std::any_cast<Moment>(moment2Ret);
-        std::cout << "invoke(\"newMoment\", {12}).id = " << moment2.id << std::endl;
+        std::cout << "invoke(\"main.newMoment\", {12}).id = " << moment2.id << std::endl;
+        json j;
+        j["type"] = "main.Moment";
+        unitauto::invoke_method(j, "main.Moment.setId", {static_cast<long>(123)});
 
-        unitauto::invoke("main.Moment.setId", {static_cast<long>(123)});
-
-        auto getIdRet = unitauto::invoke("main.Moment.getId", {});
+        auto getIdRet = unitauto::invoke_method(j, "main.Moment.getId", {});
         std::cout << "invoke(\"main.Moment.getId\", {}) = " << std::any_cast<long>(getIdRet) << std::endl;
 
         User user = User();
@@ -182,10 +183,9 @@ struct Person {
     User u = j.get<User>();
     void* obj;
     try {
-        obj = unitauto::json_2_obj(str, "User");
+        obj = unitauto::json_2_obj(j, "User");
     } catch (const std::exception& e) {
         std::cerr << "json 2 obj failed:" << e.what() << std::endl;
-        return 1;
     }
 
     User* userPtr = static_cast<User*>(obj);
@@ -218,7 +218,18 @@ struct Person {
 
 int main() {
     // 必须先注册类型
-    unitauto::add_type<Moment>("Moment");
+    // unitauto::add_type<Moment>("main.Moment");
+    unitauto::add_type<Moment>("main.Moment", [](json &j) -> Moment {
+        std::cout << "\ncallback Moment: {" << std::endl;
+        Moment ins = unitauto::INSTANCE_GETTER<Moment>(j);
+        unitauto::add_func("main.Moment.getId", &ins, &Moment::getId);
+        unitauto::add_func("main.Moment.setId", &ins, &Moment::setId);
+        unitauto::add_func("main.Moment.setContent", &ins, &Moment::setContent);
+        unitauto::add_func("main.Moment.getContent", &ins, &Moment::getContent);
+        std::cout << "\ncallback return ins;" << std::endl;
+        return ins;
+    });
+
     unitauto::add_struct<User>("User");
     unitauto::add_type<unitauto::test::TestUtil>("unitauto.test.TestUtil");
 
@@ -247,12 +258,6 @@ int main() {
     unitauto::add_func("main.User.getName", &user, &User::getName);
     unitauto::add_func("main.User.setDate", (User *) nullptr, &User::setDate);
     unitauto::add_func("main.User.getDate", User(), &User::getDate);
-
-    Moment moment(2);
-    unitauto::add_func("main.Moment.getId", &moment, &Moment::getId);
-    unitauto::add_func("main.Moment.setId", (Moment *) nullptr, &Moment::setId);
-    unitauto::add_func("main.Moment.setContent", (Moment *) nullptr, &Moment::setContent);
-    unitauto::add_func("main.Moment.getContent", (Moment *) nullptr, &Moment::getContent);
 
     unitauto::add_func("unitauto.test.TestUtil.divide", (unitauto::test::TestUtil *) nullptr, &unitauto::test::TestUtil::divide);
 
