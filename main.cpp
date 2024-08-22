@@ -215,6 +215,18 @@ struct Person {
     return 0;
 }
 
+static int compare(User u, User u2) {
+     if (u.id < u2.id) {
+         return -1;
+     }
+
+     if (u.id > u2.id) {
+         return 1;
+     }
+
+     return 0;
+ }
+
 
 int main() {
     // 必须先注册类型
@@ -265,6 +277,7 @@ int main() {
     unitauto::add_func("unitauto.test.TestUtil.divide", (unitauto::test::TestUtil *) nullptr, &unitauto::test::TestUtil::divide);
 
     test();
+    unitauto::add_func("main.compare", std::function<int(User,User)>(compare));
 
     unitauto::start(8084);
 
