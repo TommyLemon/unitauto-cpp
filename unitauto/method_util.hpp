@@ -108,18 +108,27 @@ namespace unitauto {
 
     // 注册类型转换函数
     template<typename T>
-    void add_cast(std::string type) {
-        CAST_MAP[type] = [](std::any value) -> json {
+    void add_cast(std::string type, json caster(std::any val)) {
+        CAST_MAP[type] = caster != nullptr ? caster : [](std::any value) -> json {
+            json j;
             try {
-                return std::any_cast<T>(value);
-            } catch (const std::exception& e) {
-                std::stringstream ss;
-                ss << &value;
-                json j;
-                j["type"] = value.type().name();
-                j["value"] = ss.str();
+                j = std::any_cast<T>(value); // j = json::parse(value);
                 return j;
+            } catch (const nlohmann::json::parse_error& ex) {
+                std::cout << "nlohmann::json::parse_error at byte " << ex.byte << ": " << ex.what() << std::endl;
+            } catch (const nlohmann::json::type_error& ex) {
+                std::cout << "nlohmann::json::type_error " << ex.what() << std::endl;
+            } catch (const nlohmann::json::other_error& ex) {
+                std::cout << "nlohmann::json::other_error " << ex.what() << std::endl;
+            } catch (const std::exception& e) {
+                std::cout << "add_cast j.dump() >> std::exceptione " << e.what() << std::endl;
             }
+
+            std::stringstream ss;
+            ss << &value;
+            j["type"] = value.type().name();
+            j["value"] = ss.str();
+            return j;
         };
 
         std::string t = typeid(T).name();
@@ -180,18 +189,46 @@ namespace unitauto {
     }
 
     // any_to_json 函数
-    json _any_to_json(const std::any& value) {
-        std::string type = value.type().name();
+    json _any_to_json(const std::any& value, std::string type) {
+        std::string type2 = value.type().name();
+        if (type.empty()) {
+            type = type2;
+        }
+
         auto it = CAST_MAP.find(type);
         if (it == CAST_MAP.end()) {
             std::string t = TYEP_ALIAS_MAP[type];
             if (t != type && ! t.empty()) {
                 it = CAST_MAP.find(t);
             }
+
+            if (it == CAST_MAP.end()) {
+                it = CAST_MAP.find(type2);
+
+                if (it == CAST_MAP.end()) {
+                    t = TYEP_ALIAS_MAP[type2];
+                    if (t != type2 && ! t.empty()) {
+                        it = CAST_MAP.find(t);
+                    }
+                }
+            }
         }
 
         if (it != CAST_MAP.end()) {
             return it->second(value);
+        }
+
+        try {
+            auto j = std::any_cast<json>(value);
+            return j;
+        } catch (const nlohmann::json::parse_error& ex) {
+            std::cout << "nlohmann::json::parse_error at byte " << ex.byte << ": " << ex.what() << std::endl;
+        } catch (const nlohmann::json::type_error& ex) {
+            std::cout << "nlohmann::json::type_error " << ex.what() << std::endl;
+        } catch (const nlohmann::json::other_error& ex) {
+            std::cout << "nlohmann::json::other_error " << ex.what() << std::endl;
+        } catch (const std::exception& e) {
+            std::cout << "add_cast j.dump() >> std::exceptione " << e.what() << std::endl;
         }
 
         std::stringstream ss;
@@ -200,11 +237,12 @@ namespace unitauto {
         j["type"] = value.type().name();
         j["value"] = ss.str();
 
-        return j; // (json&) value;
+        return j; //
+        // return (json&) value;
     }
 
     // any_to_json 函数模板
-    json any_to_json(const std::any& value) {
+    json any_to_json(const std::any& value, std::string type) {
         if (! value.has_value()) {
             json j;
             return j;
@@ -337,9 +375,15 @@ namespace unitauto {
             // }
         } catch (const std::exception& e) {
             std::cout << e.what() << std::endl;
+        } catch (const nlohmann::json::parse_error& ex) {
+            std::cout << "nlohmann::json::parse_error at byte " << ex.byte << ": " << ex.what() << std::endl;
+        } catch (const nlohmann::json::type_error& ex) {
+            std::cout << "nlohmann::json::type_error " << ex.what() << std::endl;
+        } catch (const nlohmann::json::other_error& ex) {
+            std::cout << "nlohmann::json::other_error " << ex.what() << std::endl;
         }
 
-        return _any_to_json(value);
+        return _any_to_json(value, type);
     }
 
     static std::any json_to_any(json &j) {
@@ -421,6 +465,12 @@ namespace unitauto {
                 return json_2_obj(j, type);
             } catch (const std::exception& e) {
                 return json_2_any(j, type);
+            } catch (const nlohmann::json::parse_error& ex) {
+                std::cout << "nlohmann::json::parse_error at byte " << ex.byte << ": " << ex.what() << std::endl;
+            } catch (const nlohmann::json::type_error& ex) {
+                std::cout << "nlohmann::json::type_error " << ex.what() << std::endl;
+            } catch (const nlohmann::json::other_error& ex) {
+                std::cout << "nlohmann::json::other_error " << ex.what() << std::endl;
             }
         }
 
@@ -615,6 +665,12 @@ namespace unitauto {
                 return json_2_obj(value, type);
             } catch (const std::exception& e) {
                 return json_2_any(value, type);
+            } catch (const nlohmann::json::parse_error& ex) {
+                std::cout << "nlohmann::json::parse_error at byte " << ex.byte << ": " << ex.what() << std::endl;
+            } catch (const nlohmann::json::type_error& ex) {
+                std::cout << "nlohmann::json::type_error " << ex.what() << std::endl;
+            } catch (const nlohmann::json::other_error& ex) {
+                std::cout << "nlohmann::json::other_error " << ex.what() << std::endl;
             }
         }
 
@@ -665,9 +721,9 @@ namespace unitauto {
 
     // 注册类型
     template<typename T>
-    static void add_type(const std::string& type, T callback(json& j)) {
+    static void add_type(const std::string& type, T callback(json& j), json caster(std::any val)) {
         // typeid(T).name() 会得到 4User 这种带了其它字符的名称
-        TYPE_MAP[type] = [callback](json& j) -> void* {
+        auto cb = [callback](json& j) -> void* {
             // if (callback == nullptr) {
             //     callback = INSTANCE_GETTER<T>;
             // }
@@ -675,15 +731,21 @@ namespace unitauto {
             auto p = &obj;
             return static_cast<void*>(p);
         };
+        TYPE_MAP[type + "*"] = TYPE_MAP[type + "&"] = cb;
 
         std::string t = typeid(T).name();
         if (t != type) {
-            TYPE_MAP[t] = TYPE_MAP[type];
+            TYPE_MAP[t + "*"] = TYPE_MAP[t + "&"] = cb;
             TYEP_ALIAS_MAP[t] = type;
             TYEP_ALIAS_MAP[type] = t;
         }
 
-        add_cast<T>(type);
+        add_cast<T>(type, caster);
+    }
+
+    template<typename T>
+    static void add_type(const std::string& type, T callback(json& j)) {
+        add_type<T>(type, callback, nullptr);
     }
 
     // 注册类型
@@ -700,15 +762,10 @@ namespace unitauto {
 
     // 注册类型
     template<typename T>
-    static void add_struct(const std::string& type) {
+    static void add_struct(const std::string& type, T callback(json& j), json caster(std::any val)) {
         // typeid(T).name() 会得到 4User 这种带了其它字符的名称
-        STRUCT_MAP[type] = [](json &j) -> std::any {
-            if (j.empty()) {
-                T obj = T();
-                return std::any_cast<T>(obj);
-            }
-
-            T obj = T(j.get<T>());
+        STRUCT_MAP[type] = [callback](json &j) -> std::any {
+            auto obj = callback != nullptr ? callback(j) : INSTANCE_GETTER<T>(j);
             return std::any_cast<T>(obj);
         };
 
@@ -719,7 +776,19 @@ namespace unitauto {
             TYEP_ALIAS_MAP[type] = t;
         }
 
-        add_type<T>(type);
+        add_type<T>(type, callback, caster);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_struct(const std::string& type, T callback(json& j)) {
+        add_struct<T>(type, callback, nullptr);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_struct(const std::string& type) {
+        add_struct<T>(type, nullptr);
     }
 
     // 取消注册类型
@@ -748,15 +817,21 @@ namespace unitauto {
         json type = thiz["type"];
         json value = thiz["value"];
         if (! type.empty()) {
-            auto it = TYPE_MAP.find(type.get<std::string>());
+            std::string t = type.get<std::string>();
+            auto it = TYPE_MAP.find(t);
             if (it != TYPE_MAP.end()) {
                 it->second(value);
+            } else {
+                auto it2 = STRUCT_MAP.find(t);
+                if (it2 != STRUCT_MAP.end()) {
+                    it2->second(value);
+                }
             }
         }
 
         auto it = FUNC_MAP.find(name);
         if (it != FUNC_MAP.end()) {
-            return it->second(value, args);
+            return it->second(thiz, args);
         }
         throw std::runtime_error("Unkown func: " + name + ", call add_func firstly!");
     }
@@ -814,9 +889,11 @@ namespace unitauto {
     // 注册方法(成员函数)，针对 class 等的指针方式
     template<typename Ret, typename T, typename... Args>
     static void add_func(const std::string &name, T *instance, Ret (T::*func)(Args...)) {
-        FUNC_MAP[name] = [&instance, func](json &j, std::vector<std::any> args) -> std::any {
-            if (! j.empty() || instance == nullptr) {
-                auto ins = INSTANCE_GETTER<T>(j); // static_cast<T>(ins);
+        FUNC_MAP["&" + name] = [&instance, func](json &j, std::vector<std::any> args) -> std::any {
+            std::string type = j["type"];
+            json value = j["value"];
+            if (instance == nullptr || ! value.empty()) {
+                auto ins = INSTANCE_GETTER<T>(value); // static_cast<T>(ins);
                 instance = &ins;
             }
 
@@ -828,8 +905,18 @@ namespace unitauto {
             }
 
             if (! j.empty()) {
-                j["type"] = get_type(instance);
-                j["value"] = any_to_json(instance);
+                json v = any_to_json(instance, type);
+                std::string t = get_type(instance);
+                if (! t.empty()) {
+                    j["type"] = t;
+                    if (v.empty()) {
+                        v = any_to_json(instance, type);
+                    }
+                }
+
+                if (! v.empty()) {
+                    j["value"] = v;
+                }
             }
 
             return ret;
@@ -851,6 +938,8 @@ namespace unitauto {
                 return invoke_struct(instance, func, args, std::index_sequence_for<Args...>{});
             }
         };
+
+        add_func(name, &instance, func);
     }
 
     // 函数与方法(成员函数) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -1061,6 +1150,18 @@ namespace unitauto {
         } catch (const std::exception& e) {
             result["code"] = 500;
             result["msg"] = e.what();
+        } catch (const nlohmann::json::parse_error& ex) {
+            std::cout << "nlohmann::json::parse_error at byte " << ex.byte << ": " << ex.what() << std::endl;
+            result["code"] = 500;
+            result["msg"] = ex.what();
+        } catch (const nlohmann::json::type_error& ex) {
+            std::cout << "nlohmann::json::type_error " << ex.what() << std::endl;
+            result["code"] = 500;
+            result["msg"] = ex.what();
+        } catch (const nlohmann::json::other_error& ex) {
+            std::cout << "nlohmann::json::other_error " << ex.what() << std::endl;
+            result["code"] = 500;
+            result["msg"] = ex.what();
         }
 
         return result;
@@ -1098,8 +1199,9 @@ namespace unitauto {
             json is_static = j["static"];
             bool is_sttc = is_static.empty() ? thiz.empty() && clsArgs.empty() && (cls.empty() || cls.at(0) < 'A' || cls.at(0) > 'Z') : is_static.get<bool>();
 
+            json tt;
             if (! is_sttc) {
-                json tt = thiz["type"];
+                tt = thiz["type"];
                 if (tt.empty()) {
                     thiz["type"] = tt = (pkg.empty() ? "" : pkg + ".") + cls;
                 }
@@ -1126,44 +1228,74 @@ namespace unitauto {
                 args.push_back(a);
 
                 json ma;
+                std::string t;
                 try {
-                    std::string t = get_type(a);
-                    ma["type"] = t.empty() ? arg.type_name() : t;
+                    t = get_type(a);
+                    if (t.empty()) {
+                        t = arg.type_name();
+                    }
+                    ma["type"] = t;
                 } catch (const std::exception& e) {
                     std::cout << "invoke_json  try { \n auto type_cs = typeid(a).name();... \n } catch (const std::exception& e) = " << e.what() << " >> ma[\"type\"] = arg.type_name();" << std::endl;
-                    ma["type"] = arg.type_name();
+                    t = arg.type_name();
+                    ma["type"] = t;
+                } catch (const nlohmann::json::parse_error& ex) {
+                    std::cout << "nlohmann::json::parse_error at byte " << ex.byte << ": " << ex.what() << std::endl;
+                } catch (const nlohmann::json::type_error& ex) {
+                    std::cout << "nlohmann::json::type_error " << ex.what() << std::endl;
+                } catch (const nlohmann::json::other_error& ex) {
+                    std::cout << "nlohmann::json::other_error " << ex.what() << std::endl;
                 }
 
                 try {
-                    ma["value"] = any_to_json(a);
+                    ma["value"] = any_to_json(a, ma["type"].get<std::string>());
                 } catch (const std::exception& e) {
                     std::cout << "invoke_json  try { \n ma[\"value\"] = any_to_json(a); \n } catch (const std::exception& e) = " << e.what() << " >> ma[\"value\"] = arg;" << std::endl;
                     ma["value"] = arg;
+                } catch (const nlohmann::json::parse_error& ex) {
+                    std::cout << "nlohmann::json::parse_error at byte " << ex.byte << ": " << ex.what() << std::endl;
+                } catch (const nlohmann::json::type_error& ex) {
+                    std::cout << "nlohmann::json::type_error " << ex.what() << std::endl;
+                } catch (const nlohmann::json::other_error& ex) {
+                    std::cout << "nlohmann::json::other_error " << ex.what() << std::endl;
                 }
 
                 methodArgs.push_back(ma);
             }
 
             std::any ret = invoke_method(thiz, path, args);
-            std::string type = get_type(ret);
 
             result["code"] = 200;
             result["msg"] = "success";
+            std::string type = get_type(ret);
             if (! type.empty()) {
                 result["type"] = type;  // type_cs;
-            }
-            if (ret.has_value()) {
-                result["return"] = any_to_json(ret);
+
+                json v = any_to_json(ret, type);
+                result["return"] = v;
             }
 
             if (! is_sttc) {
-                result["this"] = any_to_json(thiz);
+                std::string type = tt.get<std::string>();
+                result["this"] = any_to_json(thiz, type);
             }
 
             result["methodArgs"] = methodArgs; // any_to_json(args);
         } catch (const std::exception& e) {
             result["code"] = 500;
             result["msg"] = e.what();
+        } catch (const nlohmann::json::parse_error& ex) {
+            std::cout << "nlohmann::json::parse_error at byte " << ex.byte << ": " << ex.what() << std::endl;
+            result["code"] = 500;
+            result["msg"] = ex.what();
+        } catch (const nlohmann::json::type_error& ex) {
+            std::cout << "nlohmann::json::type_error " << ex.what() << std::endl;
+            result["code"] = 500;
+            result["msg"] = ex.what();
+        } catch (const nlohmann::json::other_error& ex) {
+            std::cout << "nlohmann::json::other_error " << ex.what() << std::endl;
+            result["code"] = 500;
+            result["msg"] = ex.what();
         }
 
         return result;
@@ -1228,12 +1360,12 @@ namespace unitauto {
                 if (path == "/method/invoke") {
                     json j = json::parse(json_data);
                     json result = invoke_json(j);
-                    response_json = result.dump();
+                    response_json = result.dump(-1, ' ', false, nlohmann::detail::error_handler_t::ignore);
                 }
                 else if (path == "/method/list") {
                     json j = json::parse(json_data);
                     json result = list_json(j);
-                    response_json = result.dump();
+                    response_json = result.dump(-1, ' ', false, nlohmann::detail::error_handler_t::ignore);
                 }
                 else {
                     response_json = R"({

@@ -203,14 +203,14 @@ struct Person {
     }
 
 
-    json result;
-    result["code"] = 200;
-    result["msg"] = "success";
-    result["type"] = type;
-    result["return"] = unitauto::any_to_json(ret);
-    result["methodArgs"] = json::array({{{"type", "long"}, {"value", 1}}, {{"type", "long"}, {"value", 2}}});
+    // json result;
+    // result["code"] = 200;
+    // result["msg"] = "success";
+    // result["type"] = type;
+    // result["return"] = unitauto::any_to_json(ret);
+    // result["methodArgs"] = json::array({{{"type", "long"}, {"value", 1}}, {{"type", "long"}, {"value", 2}}});
 
-    std::cout << "\n\ntest return " << result.dump(4) << std::endl;
+    // std::cout << "\n\ntest return " << result.dump(4) << std::endl;
 
     return 0;
 }
@@ -219,19 +219,22 @@ struct Person {
 int main() {
     // 必须先注册类型
     // unitauto::add_type<Moment>("main.Moment");
-    unitauto::add_type<Moment>("main.Moment", [](json &j) -> Moment {
+    unitauto::add_struct<Moment>("main.Moment", [](json &j) -> Moment {
         std::cout << "\ncallback Moment: {" << std::endl;
         Moment ins = unitauto::INSTANCE_GETTER<Moment>(j);
-        unitauto::add_func("main.Moment.getId", &ins, &Moment::getId);
-        unitauto::add_func("main.Moment.setId", &ins, &Moment::setId);
-        unitauto::add_func("main.Moment.setContent", &ins, &Moment::setContent);
-        unitauto::add_func("main.Moment.getContent", &ins, &Moment::getContent);
+        unitauto::add_func("main.Moment.getId", ins, &Moment::getId);
+        unitauto::add_func("main.Moment.setId", ins, &Moment::setId);
+        unitauto::add_func("main.Moment.setContent", ins, &Moment::setContent);
+        unitauto::add_func("main.Moment.getContent", ins, &Moment::getContent);
         std::cout << "\ncallback return ins;" << std::endl;
         return ins;
+    // }, [](std::any val) -> json {
+    //     auto j = std::any_cast<Moment>(val);
+    //     return j;
     });
 
     unitauto::add_struct<User>("User");
-    unitauto::add_type<unitauto::test::TestUtil>("unitauto.test.TestUtil");
+    unitauto::add_struct<unitauto::test::TestUtil>("unitauto.test.TestUtil");
 
     // 注册函数
     unitauto::add_func("print", std::function<void(const std::string &)>(print));
