@@ -1399,6 +1399,13 @@ namespace unitauto {
         close(client_socket);
     }
 
+    static bool running = true;
+    static void handle_signal(int signal) {
+        if (signal == SIGINT) {
+            running = false;
+        }
+    }
+
     static int start(int port) { // C++ 不支持重载方法
         port = port <= 0 ? 8084 : port;
 
@@ -1408,19 +1415,51 @@ namespace unitauto {
         server_addr.sin_addr.s_addr = INADDR_ANY;
         server_addr.sin_port = htons(port);
 
-        bind(server_socket, (sockaddr*)&server_addr, sizeof(server_addr));
-        listen(server_socket, SOMAXCONN);
+        if (bind(server_socket, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
+            std::cerr << "Failed to bind socket: " << strerror(errno) << std::endl;
+            close(server_socket);
+            return -1;
+        }
+
+        if (listen(server_socket, SOMAXCONN) == -1) {
+            std::cerr << "Failed to listen socket: " << strerror(errno) << std::endl;
+            close(server_socket);
+            return -1;
+        }
 
         std::cout << "Server is running on port " << port << "..." << std::endl;
+        signal(SIGINT, handle_signal);
 
-        while (true) {
-            int client_socket = accept(server_socket, nullptr, nullptr);
-            handle_request(client_socket);
+        fd_set read_fds;
+        int max_fd = server_socket;
+
+        while (running) {
+            FD_ZERO(&read_fds);
+            FD_SET(server_socket, &read_fds);
+
+            struct timeval timeout;
+            timeout.tv_sec = 1;
+            timeout.tv_usec = 0;
+
+            int activity = select(max_fd + 1, &read_fds, nullptr, nullptr, &timeout);
+            if (activity < 0 && errno != EINTR) {
+                std::cerr << "Server select error: " << strerror(errno) << std::endl;
+                break;
+            }
+
+            if (activity > 0 && FD_ISSET(server_socket, &read_fds)) {
+                int client_socket = accept(server_socket, nullptr, nullptr);
+                if (client_socket >= 0) {
+                    handle_request(client_socket);
+                } else {
+                    std::cerr << "Server sccept error: " << strerror(errno) << std::endl;
+                }
+            }
         }
 
         close(server_socket);
+        std::cout << "Server stopped!" << std::endl;
         return 0;
     }
-
 
 }
