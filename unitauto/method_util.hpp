@@ -26,6 +26,8 @@ limitations under the License.*/
 #include <netinet/in.h>
 #include <unistd.h>
 #include <typeinfo>
+#include <fstream>
+#include <cstdlib> // for system()
 
 /**@author Lemon
  */
@@ -1301,6 +1303,24 @@ namespace unitauto {
         return result;
     }
 
+    // 生成覆盖率报告
+    void generate_coverage_report() {
+        // 生成覆盖率数据
+        system("lcov --capture --directory . --output-file coverage.info");
+        // 过滤掉不需要的数据
+        system("lcov --remove coverage.info '/usr/*' '*/tests/*' '*/external/*' --output-file coverage_filtered.info");
+        // 生成 HTML 报告
+        system("genhtml coverage_filtered.info --output-directory coverage");
+    }
+
+    // 读取文件内容
+    std::string read_file(const std::string& file_path) {
+        std::ifstream file(file_path);
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        return buffer.str();
+    }
+
     // 处理请求并生成响应
     inline void handle_request(int client_socket) {
         char buffer[1024];
@@ -1347,6 +1367,9 @@ namespace unitauto {
                 first = false;
             }
 
+            int status = 200;
+            std::string location = "";
+
             // 处理数据并生成响应 JSON
             std::string response_json = R"({
                 "code": 200,
@@ -1355,22 +1378,45 @@ namespace unitauto {
 
             bool isOpt = method == "options" || method == "OPTIONS";
             bool isPost = method == "post" || method == "POST";
+            bool isGet = method == "get" || method == "GET";
+            bool isGetOrPost = isGet || isPost;
 
-            if (isPost) {
+            if (isGetOrPost && path == "/coverage/start") {
+                // TODO system("");
+            }
+            else if (isGetOrPost && path == "/coverage/stop") {
+                // TODO system("");
+            }
+            else if (isGetOrPost && path == "/coverage/save") {
+                generate_coverage_report();
+            }
+            else if (isGetOrPost && path == "/coverage/report") {
+                json result;
+                result["code"] = 200;
+                result["msg"] = "success";
+                result["url"] = "/coverage/index.html";
+                result["html"] = read_file("coverage/index.html");
+                result["json"] = read_file("coverage_filtered.info");
+                response_json = result.dump();
+            }
+            else if (isGet && (path == "/coverage" || path == "/coverage/index.html")) {
+                status = 301;
+                location = "Location: " + host + "/coverage/index.html";
+            }
+            else if (isPost) {
+                json j = json::parse(json_data);
                 if (path == "/method/invoke") {
-                    json j = json::parse(json_data);
                     json result = invoke_json(j);
                     response_json = result.dump(-1, ' ', false, nlohmann::detail::error_handler_t::ignore);
                 }
                 else if (path == "/method/list") {
-                    json j = json::parse(json_data);
                     json result = list_json(j);
                     response_json = result.dump(-1, ' ', false, nlohmann::detail::error_handler_t::ignore);
                 }
                 else {
                     response_json = R"({
                     "code": 404,
-                    "msg": "Only support POST /method/invoke and POST /method/list ！"
+                    "msg": "Only support POST /method/invoke, POST /method/list, POST /coverage/save ！"
                 })";
                 }
             }
@@ -1383,13 +1429,17 @@ namespace unitauto {
 
             // 构建 HTTP 响应
             std::ostringstream response;
-            response << "HTTP/1.1 200 OK\r\n";
+            response << "HTTP/1.1 " << status << " OK\r\n";
             response << "Content-Type: application/json\r\n";
             response << "Access-Control-Allow-Origin:" + host + "\n";
             response << "Access-Control-Allow-Credentials: true\r\n";
             response << "Access-Control-Allow-Headers: content-type\r\n";
             response << "Access-Control-Request-Method: POST\r\n";
             response << "Content-Length: " << response_json.size() << "\r\n";
+            if (location.length() > 0) {
+                response << location << "\r\n";
+            }
+
             response << "\r\n";
             response << response_json;
 
