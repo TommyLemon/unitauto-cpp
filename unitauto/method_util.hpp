@@ -35,6 +35,65 @@ limitations under the License.*/
 /**@author Lemon
  */
 namespace unitauto {
+    // using any = std::any;
+    // using string = std::string;
+    // using vector = std::vector;
+    using json = nlohmann::json;
+
+    // 打印单个元素的辅助函数
+    template<typename T>
+    static void print(const T& value) {
+        std::cout << value << " ";
+    }
+
+    // 递归打印参数包的辅助函数
+    template<typename T, typename... Args>
+    static void print(const T& first, const Args&... args) {
+        print(first); // 打印第一个参数
+        print(args...); // 递归打印剩余参数
+    }
+
+    // 打印单个元素的辅助函数
+    template<typename T>
+    static void println(const T& value) {
+        std::cout << value << std::endl;
+    }
+
+    // 递归打印参数包的辅助函数
+    template<typename T, typename... Args>
+    static void println(const T& first, const Args&... args) {
+        print(first); // 打印第一个参数
+        print(args...); // 递归打印剩余参数
+        print("\n");
+    }
+
+    // 打印单个元素的辅助函数
+    template<typename T>
+    static void printErr(const T& value) {
+        std::cerr << value << " ";
+    }
+
+    // 递归打印参数包的辅助函数
+    template<typename T, typename... Args>
+    static void printErr(const T& first, const Args&... args) {
+        printErr(first); // 打印第一个参数
+        printErr(args...); // 递归打印剩余参数
+    }
+
+    // 打印单个元素的辅助函数
+    template<typename T>
+    static void printlnErr(const T& value) {
+        std::cerr << value << std::endl;
+    }
+
+    // 递归打印参数包的辅助函数
+    template<typename T, typename... Args>
+    static void printlnErr(const T& first, const Args&... args) {
+        printErr(first); // 打印第一个参数
+        printErr(args...); // 递归打印剩余参数
+        print("\n");
+    }
+
     // 用于解码类型名称的函数
     static std::string demangle(const char* name) {
         int status = 0;
@@ -45,7 +104,6 @@ namespace unitauto {
         return (status == 0) ? res.get() : name;
     }
 
-    using json = nlohmann::json;
 
     static std::string DEFAULT_MODULE_PATH = "unitauto";
 
@@ -80,6 +138,7 @@ namespace unitauto {
         type = std::regex_replace(type, std::regex("std."), "");
         type = std::regex_replace(type, std::regex("__1::"), "");
         type = std::regex_replace(type, std::regex("__1."), "");
+        type = std::regex_replace(type, std::regex("::"), ".");
 
         if (type.empty() || type == "v" || type == "Dn" || type == "NULL" || type == "null" || type == "nullptr" || type == "nullptr_t") {
             return "";
@@ -176,8 +235,28 @@ namespace unitauto {
     //     auto j = nlohmann::to_json(obj);
     // }
 
+    // JSON 字符串转对应类型的值对象
+    template<typename T>
+    static T json_2_val(json &j, const std::string& type) {
+        auto it = STRUCT_MAP.find(type);
+        if (it == STRUCT_MAP.end()) {
+            std::string t = TYEP_ALIAS_MAP[type];
+            if (t != type && ! t.empty()) {
+                it = STRUCT_MAP.find(t);
+            }
+        }
+
+        if (it != STRUCT_MAP.end()) {
+            auto val = it->second(j);
+            return any_cast<T>(val);
+        }
+
+        throw std::runtime_error("Unknown struct type: "+ type + ", call add_strcut/add_type firstly!");
+    }
+
     // JSON 字符串转对应类型的对象
-    static void* json_2_obj(json &j, const std::string& type) {
+    template<typename T>
+    static T* json_2_obj(json &j, const std::string& type) {
         auto it = TYPE_MAP.find(type);
         if (it == TYPE_MAP.end()) {
             std::string t = TYEP_ALIAS_MAP[type];
@@ -187,10 +266,14 @@ namespace unitauto {
         }
 
         if (it != TYPE_MAP.end()) {
-            return it->second(j);
+            auto val = it->second(j);
+            return static_cast<T*>(val);
         }
 
-        throw std::runtime_error("Unknown type: "+ type + ", call add_type firstly!");
+        T val = json_2_val<T>(j, type);
+        return &val;
+
+        // throw std::runtime_error("Unknown type: "+ type + ", call add_type firstly!");
     }
 
 
@@ -493,7 +576,7 @@ namespace unitauto {
 
             json j = vs;
             try {
-                return json_2_obj(j, type);
+                return json_2_obj<std::any>(j, type);
             } catch (const std::exception& e) {
                 return json_2_any(j, type);
             } catch (const nlohmann::json::parse_error& ex) {
@@ -695,7 +778,7 @@ namespace unitauto {
             }
 
             try {
-                return json_2_obj(value, type);
+                return json_2_obj<std::any>(value, type);
             } catch (const std::exception& e) {
                 return json_2_any(value, type);
             } catch (const nlohmann::json::parse_error& ex) {
