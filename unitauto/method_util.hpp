@@ -1001,9 +1001,10 @@ namespace unitauto {
     }
 
     // 执行已注册的函数/方法(成员函数)
-    static std::any invoke_method(json &thiz, const std::string &name, std::vector<std::any> args) {
+    static std::any invoke_method(json &thiz, const std::string &func, std::vector<std::any> args) {
         json type = thiz["type"];
         json value = thiz["value"];
+
         if (! type.empty()) {
             std::string t = trim_type(type.get<std::string>());
             auto it = PTR_MAP.find(t);
@@ -1017,11 +1018,12 @@ namespace unitauto {
             }
         }
 
-        auto it = FUNC_MAP.find(name);
+        auto it = FUNC_MAP.find(func);
         if (it != FUNC_MAP.end()) {
             return it->second(thiz, args);
         }
-        throw std::runtime_error("Unkown func: " + name + ", call add_func firstly!");
+
+        throw std::runtime_error("Unkown func: " + func + ", call add_func/add_const_func firstly!");
     }
 
     // 执行非 void 函数
@@ -1467,13 +1469,27 @@ namespace unitauto {
             json thiz = j["this"];
 
             json is_static = j["static"];
-            bool is_sttc = is_static.empty() ? thiz.empty() && clsArgs.empty() && (cls.empty() || cls.at(0) < 'A' || cls.at(0) > 'Z') : is_static.get<bool>();
+
+            bool is_sttc;
+            bool is_sttc1 = (! is_static.empty()) && is_static.get<bool>();
+            bool is_sttc2 = path.at(0) != '&' && thiz.empty() && clsArgs.empty();
+
+            if (is_static.empty()) {
+                is_sttc = is_sttc2 && (cls.empty() || cls.at(0) < 'A' || cls.at(0) > 'Z');
+            }
+            else if (is_sttc1 && is_sttc1 != is_sttc2) {
+                throw std::runtime_error("static cannot be true while method path starts with '&' or this/classArgs is not empty!");
+            }
+            else {
+                is_sttc = is_sttc1;
+            }
 
             json tt;
             if (! is_sttc) {
                 tt = thiz["type"];
                 if (tt.empty()) {
-                    thiz["type"] = tt = (pkg.empty() ? "" : pkg + ".") + cls;
+                    std::string t = (pkg.empty() ? "" : pkg + ".") + cls;
+                    thiz["type"] = tt = t;
                 }
 
                 std::string type = tt.get<std::string>();
@@ -2018,7 +2034,7 @@ namespace unitauto {
     #define UNITAUTO_ADD_METHOD(Type, ...) \
         { \
             std::string name = #Type; \
-            unitauto::add_val<Type>(name); \
+            unitauto::add_type<Type>(name); \
             Type ins; /* = Type(); */ \
             const std::type_info& ti = typeid(ins); \
             std::string path = unitauto::demangle(ti.name()); \
