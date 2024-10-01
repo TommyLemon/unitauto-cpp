@@ -51,7 +51,7 @@ struct User {
     }
 
     // TODO FIXME 对 char 等部分类型无效
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(User, id, sex, name, date)
+    UNITAUTO_ADD_STRUCT(User, id, sex, name, date)
 
     bool is_male()
     {
@@ -109,7 +109,7 @@ public:
         return this->content;
     }
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Moment, id, userId, content)
+    UNITAUTO_ADD_CLASS(Moment, id, userId, content)
 };
 
 Moment newMoment(long id) {
@@ -133,7 +133,7 @@ struct Person {
         return true;
     }
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Person, name, age)
+    UNITAUTO_ADD_STRUCT(Person, name, age)
 };
 
 
