@@ -257,7 +257,7 @@ namespace unitauto {
 
         if (it != STRUCT_MAP.end()) {
             auto val = it->second(j);
-            return any_cast<T>(val);
+            return std::any_cast<T>(val);
         }
 
         throw std::runtime_error("Unknown struct type: "+ type + ", call add_strcut/add_type firstly!");
@@ -1739,7 +1739,7 @@ namespace unitauto {
     //     unitauto::add_func(f, ins, std::get<0>(tup)); \
     // }
 
-    static std::vector<std::string> splitMethodDef(std::string fs) {
+    static std::vector<std::string> split_method_def(std::string fs) {
         auto vec = std::vector<std::string>();
 
         fs = std::regex_replace(fs, std::regex(" "), "");
@@ -1932,11 +1932,10 @@ namespace unitauto {
 
     #define UNITAUTO_ADD_METHOD_1(...) \
         s = #__VA_ARGS__; \
-        s = s.substr(1); \
         s = std::regex_replace(s, std::regex(name), path); \
         s = std::regex_replace(s, std::regex(" "), ""); \
         s = std::regex_replace(s, std::regex("::"), "."); \
-        unitauto::add_func(s, ins, __VA_ARGS__); \
+        unitauto::add_func(s, ins, &__VA_ARGS__); \
 
 
     // #define UNITAUTO_ADD_FUNC_2(Type, ...) \

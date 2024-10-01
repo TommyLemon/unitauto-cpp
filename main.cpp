@@ -229,9 +229,9 @@ int main() {
     UNITAUTO_ADD_FUNC(add, divide, newMoment, unitauto::test::divide, unitauto::test::contains, unitauto::test::index, unitauto::test::is_contain, unitauto::test::index_of);
 
     // 注册类型(class/struct)及方法(成员函数)
-    UNITAUTO_ADD_METHOD(Moment, &Moment::getId, &Moment::setId, &Moment::getUserId, &Moment::setUserId, &Moment::getContent, &Moment::setContent);
-    UNITAUTO_ADD_METHOD(User, &User::getId, &User::setId, &User::getName, &User::setName, &User::getDate, &User::setDate);
-    UNITAUTO_ADD_METHOD(unitauto::test::TestUtil, &unitauto::test::TestUtil::divide);
+    UNITAUTO_ADD_METHOD(Moment, Moment::getId, Moment::setId, Moment::getUserId, Moment::setUserId, Moment::getContent, Moment::setContent);
+    UNITAUTO_ADD_METHOD(User, User::getId, User::setId, User::getName, User::setName, User::getDate, User::setDate);
+    UNITAUTO_ADD_METHOD(unitauto::test::TestUtil, unitauto::test::TestUtil::divide);
     // UNITAUTO_ADD_METHOD(Person, Person::testStatic);
 
     // 自定义注册类型
