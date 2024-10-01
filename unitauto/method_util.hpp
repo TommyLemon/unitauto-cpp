@@ -236,8 +236,8 @@ namespace unitauto {
         }
     }
 
-    static std::unordered_map<std::string, std::function<void*(json &j)>> TYPE_MAP;
-    static std::unordered_map<std::string, std::function<std::any(json &j)>> STRUCT_MAP;
+    static std::unordered_map<std::string, std::function<void*(json &j)>> PTR_MAP;
+    static std::unordered_map<std::string, std::function<std::any(json &j)>> VAL_MAP;
 
     // 对象转 JSON 字符串
     // static std::string obj_2_json(const std::any& obj) {
@@ -247,34 +247,34 @@ namespace unitauto {
     // JSON 字符串转对应类型的值对象
     template<typename T>
     static T json_2_val(json &j, const std::string& type) {
-        auto it = STRUCT_MAP.find(type);
-        if (it == STRUCT_MAP.end()) {
+        auto it = VAL_MAP.find(type);
+        if (it == VAL_MAP.end()) {
             std::string t = TYEP_ALIAS_MAP[type];
             if (t != type && ! t.empty()) {
-                it = STRUCT_MAP.find(t);
+                it = VAL_MAP.find(t);
             }
         }
 
-        if (it != STRUCT_MAP.end()) {
+        if (it != VAL_MAP.end()) {
             auto val = it->second(j);
             return std::any_cast<T>(val);
         }
 
-        throw std::runtime_error("Unknown struct type: "+ type + ", call add_strcut/add_type firstly!");
+        throw std::runtime_error("Unknown struct type: "+ type + ", call add_type/add_class/add_strcut/add_ptr/add_val firstly!");
     }
 
     // JSON 字符串转对应类型的对象
     template<typename T>
     static T* json_2_obj(json &j, const std::string& type) {
-        auto it = TYPE_MAP.find(type);
-        if (it == TYPE_MAP.end()) {
+        auto it = PTR_MAP.find(type);
+        if (it == PTR_MAP.end()) {
             std::string t = TYEP_ALIAS_MAP[type];
             if (t != type && ! t.empty()) {
-                it = TYPE_MAP.find(t);
+                it = PTR_MAP.find(t);
             }
         }
 
-        if (it != TYPE_MAP.end()) {
+        if (it != PTR_MAP.end()) {
             auto val = it->second(j);
             return static_cast<T*>(val);
         }
@@ -282,7 +282,7 @@ namespace unitauto {
         T val = json_2_val<T>(j, type);
         return &val;
 
-        // throw std::runtime_error("Unknown type: "+ type + ", call add_type firstly!");
+        // throw std::runtime_error("Unknown type: "+ type + ", call add_ptr firstly!");
     }
 
 
@@ -294,19 +294,19 @@ namespace unitauto {
 
     // JSON 字符串转对应类型的对象
     static std::any json_2_any(json &j, const std::string& type) {
-        auto it = STRUCT_MAP.find(type);
-        if (it == STRUCT_MAP.end()) {
+        auto it = VAL_MAP.find(type);
+        if (it == VAL_MAP.end()) {
             std::string t = TYEP_ALIAS_MAP[type];
             if (t != type && ! t.empty()) {
-                it = STRUCT_MAP.find(t);
+                it = VAL_MAP.find(t);
             }
         }
 
-        if (it != STRUCT_MAP.end()) {
+        if (it != VAL_MAP.end()) {
             return it->second(j);
         }
 
-        throw std::runtime_error("Unknown type: "+ type + ", call add_type firstly!");
+        throw std::runtime_error("Unknown type: "+ type + ", call add_ptr firstly!");
     }
 
     // any_to_json 函数
@@ -836,7 +836,7 @@ namespace unitauto {
 
     // 注册类型
     template<typename T>
-    static void add_type(const std::string& type, T callback(json& j), json caster(std::any val)) {
+    static void add_ptr(const std::string& type, T callback(json& j), json caster(std::any val)) {
         // typeid(T).name() 会得到 4User 这种带了其它字符的名称
         auto cb = [callback](json& j) -> void* {
             // if (callback == nullptr) {
@@ -846,11 +846,11 @@ namespace unitauto {
             auto p = &obj;
             return static_cast<void*>(p);
         };
-        TYPE_MAP[type + "*"] = TYPE_MAP[type + "&"] = cb;
+        PTR_MAP[type + "*"] = PTR_MAP[type + "&"] = cb;
 
         std::string t = trim_type(demangle(typeid(T).name()));
         if (t != type) {
-            TYPE_MAP[t + "*"] = TYPE_MAP[t + "&"] = cb;
+            PTR_MAP[t + "*"] = PTR_MAP[t + "&"] = cb;
             TYEP_ALIAS_MAP[t] = type;
             TYEP_ALIAS_MAP[type] = t;
         }
@@ -859,39 +859,86 @@ namespace unitauto {
     }
 
     template<typename T>
-    static void add_type(const std::string& type, T callback(json& j)) {
-        add_type<T>(type, callback, nullptr);
+    static void add_ptr(const std::string& type, T callback(json& j)) {
+        add_ptr<T>(type, callback, nullptr);
     }
 
     // 注册类型
     template<typename T>
-    static void add_type(const std::string& type) {
-        add_type<T>(type, nullptr);
+    static void add_ptr(const std::string& type) {
+        add_ptr<T>(type, nullptr);
     }
 
 
     // 取消注册类型
-    static void remove_type(const std::string& type) {
-        TYPE_MAP.erase(type);
+    static void remove_ptr(const std::string& type) {
+        PTR_MAP.erase(type);
     }
 
     // 注册类型
     template<typename T>
-    static void add_struct(const std::string& type, T callback(json& j), json caster(std::any val)) {
+    static void add_val(const std::string& type, T callback(json& j), json caster(std::any val)) {
         // typeid(T).name() 会得到 4User 这种带了其它字符的名称
-        STRUCT_MAP[type] = [callback](json &j) -> std::any {
+        VAL_MAP[type] = [callback](json &j) -> std::any {
             auto obj = callback != nullptr ? callback(j) : INSTANCE_GETTER<T>(j);
             return std::any_cast<T>(obj);
         };
 
         std::string t = trim_type(demangle(typeid(T).name()));
         if (t != type) {
-            STRUCT_MAP[t] = STRUCT_MAP[type];
+            VAL_MAP[t] = VAL_MAP[type];
             TYEP_ALIAS_MAP[t] = type;
             TYEP_ALIAS_MAP[type] = t;
         }
+    }
 
-        add_type<T>(type, callback, caster);
+    // 注册类型
+    template<typename T>
+    static void add_val(const std::string& type, T callback(json& j)) {
+        add_val<T>(type, callback, nullptr);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_val(const std::string& type) {
+        add_val<T>(type, nullptr);
+    }
+
+    // 取消注册类型
+    static void remove_val(const std::string& type) {
+        VAL_MAP.erase(type);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_class(const std::string& type, T callback(json& j), json caster(std::any val)) {
+        add_val<T>(type, callback, caster);
+        add_ptr<T>(type, callback, caster);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_class(const std::string& type, T callback(json& j)) {
+        add_class<T>(type, callback, nullptr);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_class(const std::string& type) {
+        add_class<T>(type, nullptr);
+    }
+
+    // 取消注册类型
+    static void remove_class(const std::string& type) {
+        remove_ptr(type);
+        remove_val(type);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_struct(const std::string& type, T callback(json& j), json caster(std::any val)) {
+        add_val<T>(type, callback, caster);
+        add_ptr<T>(type, callback, caster);
     }
 
     // 注册类型
@@ -908,9 +955,35 @@ namespace unitauto {
 
     // 取消注册类型
     static void remove_struct(const std::string& type) {
-        STRUCT_MAP.erase(type);
+        remove_ptr(type);
+        remove_val(type);
     }
 
+
+    // 注册类型
+    template<typename T>
+    static void add_type(const std::string& type, T callback(json& j), json caster(std::any val)) {
+        add_val<T>(type, callback, caster);
+        add_ptr<T>(type, callback, caster);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_type(const std::string& type, T callback(json& j)) {
+        add_type<T>(type, callback, nullptr);
+    }
+
+    // 注册类型
+    template<typename T>
+    static void add_type(const std::string& type) {
+        add_type<T>(type, nullptr);
+    }
+
+    // 取消注册类型
+    static void remove_type(const std::string& type) {
+        remove_ptr(type);
+        remove_val(type);
+    }
 
     // 函数与方法(成员函数) <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -933,12 +1006,12 @@ namespace unitauto {
         json value = thiz["value"];
         if (! type.empty()) {
             std::string t = trim_type(type.get<std::string>());
-            auto it = TYPE_MAP.find(t);
-            if (it != TYPE_MAP.end()) {
+            auto it = PTR_MAP.find(t);
+            if (it != PTR_MAP.end()) {
                 it->second(value);
             } else {
-                auto it2 = STRUCT_MAP.find(t);
-                if (it2 != STRUCT_MAP.end()) {
+                auto it2 = VAL_MAP.find(t);
+                if (it2 != VAL_MAP.end()) {
                     it2->second(value);
                 }
             }
@@ -987,6 +1060,17 @@ namespace unitauto {
         (instance.*func)(std::any_cast<Args>(args[I])...);
     }
 
+    // 执行非 void 方法(成员函数)，针对 struct 等的值类型方式
+    template<typename Ret, typename T, typename... Args, std::size_t... I>
+    static std::any invoke_const(T instance, Ret (T::*func)(Args...) const, std::vector<std::any> &args, std::index_sequence<I...>) {
+        return (instance.*func)(std::any_cast<Args>(args[I])...);
+    }
+
+    // 执行 void 方法(成员函数)
+    template<typename T, typename... Args, std::size_t... I>
+    static void invoke_const_void(T instance, void (T::*func)(Args...) const, std::vector<std::any> &args, std::index_sequence<I...>) {
+        (instance.*func)(std::any_cast<Args>(args[I])...);
+    }
 
     // 注册函数
     template<typename Ret, typename... Args>
@@ -1054,7 +1138,27 @@ namespace unitauto {
             }
         };
 
-        add_func(name, &instance, func);
+        // add_func(name, &instance, func);
+    }
+
+
+    // 注册方法(成员函数)，针对 struct 等的值类型方式
+    template<typename Ret, typename T, typename... Args>
+    static void add_const_func(const std::string &name, T instance, Ret (T::*func)(Args...) const) {
+        FUNC_MAP[name] = [instance, func](json &j, std::vector<std::any> args) -> std::any {
+            // if (! j.empty()) {
+            //     j.get_to(instance);
+            // }
+
+            if constexpr (std::is_void_v<Ret>) {
+                invoke_const_void(instance, func, args, std::index_sequence_for<Args...>{});
+                return nullptr;
+            } else {
+                return invoke_const(instance, func, args, std::index_sequence_for<Args...>{});
+            }
+        };
+
+        // add_func(name, &instance, func);
     }
 
     // 函数与方法(成员函数) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -1072,7 +1176,7 @@ namespace unitauto {
     // INSTANCE_MAP[TYPE_BOOL] = false;
 
     static void init() {
-        // TYPE_MAP[TYPE_INT] = typeid(0);
+        // PTR_MAP[TYPE_INT] = typeid(0);
 
     }
 
@@ -1891,39 +1995,6 @@ namespace unitauto {
     #define UNITAUTO_PASTE63(func, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29, v30, v31, v32, v33, v34, v35, v36, v37, v38, v39, v40, v41, v42, v43, v44, v45, v46, v47, v48, v49, v50, v51, v52, v53, v54, v55, v56, v57, v58, v59, v60, v61, v62) UNITAUTO_PASTE2(func, v1) UNITAUTO_PASTE62(func, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29, v30, v31, v32, v33, v34, v35, v36, v37, v38, v39, v40, v41, v42, v43, v44, v45, v46, v47, v48, v49, v50, v51, v52, v53, v54, v55, v56, v57, v58, v59, v60, v61, v62)
     #define UNITAUTO_PASTE64(func, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29, v30, v31, v32, v33, v34, v35, v36, v37, v38, v39, v40, v41, v42, v43, v44, v45, v46, v47, v48, v49, v50, v51, v52, v53, v54, v55, v56, v57, v58, v59, v60, v61, v62, v63) UNITAUTO_PASTE2(func, v1) UNITAUTO_PASTE63(func, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29, v30, v31, v32, v33, v34, v35, v36, v37, v38, v39, v40, v41, v42, v43, v44, v45, v46, v47, v48, v49, v50, v51, v52, v53, v54, v55, v56, v57, v58, v59, v60, v61, v62, v63)
 
-
-    //  Compile Error #define UNITAUTO_ADD_FUNC(Type, ...) \
-    //     unitauto::add_struct<Type>(#Type); \
-    //     Type ins = Type(); \
-    //     std::string fs = #__VA_ARGS__; \
-    //     while (true) { \
-    //         int ind = fs.find(','); \
-    //         bool no = ind < 0 || ind == std::string::npos; \
-    //         std::string f = no ? fs : fs.substr(0, ind); \
-    //         f = std::regex_replace(f, std::regex(" "), ""); \
-    //         f = std::regex_replace(f, std::regex("::"), "."); \
-    //         \
-    //         if (ind == 0) { \
-    //             auto tup = std::make_tuple(__VA_ARGS__); \
-    //             unitauto::add_func(f, ins, std::get<0>(tup)); \
-    //         } \
-    //         else if (ind == 1) { \
-    //             auto tup = std::make_tuple(__VA_ARGS__); \
-    //             unitauto::add_func(f, ins, std::get<1>(tup)); \
-    //         } \
-    //         else if (ind == 2) { \ Compile Error
-    //             auto tup2 = std::make_tuple(__VA_ARGS__); \
-    //             unitauto::add_func(f, ins, std::get<2>(tup2)); \
-    //         } \
-    //         \
-    //         if (no) { \
-    //             break; \
-    //         } \
-    //         fs = fs.substr(ind + 1); \
-    //     } \
-    //     \
-
-
     #define UNITAUTO_ADD_FUNC_1(...) \
         s = #__VA_ARGS__; \
         s = std::regex_replace(s, std::regex(" "), ""); \
@@ -1936,44 +2007,7 @@ namespace unitauto {
         s = std::regex_replace(s, std::regex(" "), ""); \
         s = std::regex_replace(s, std::regex("::"), "."); \
         unitauto::add_func(s, ins, &__VA_ARGS__); \
-
-
-    // #define UNITAUTO_ADD_FUNC_2(Type, ...) \
-    //     unitauto::add_struct<Type>(#Type); \
-    //     Type ins = Type(); \
-    //     std::string fs = #__VA_ARGS__; \
-    //     std::vector<std::string> vec = unitauto::splitMethodDef(#__VA_ARGS__); \
-    //     auto tup = std::make_tuple(__VA_ARGS__); \
-    //     unitauto::add_func(vec.at(0), ins, std::get<0>(tup)); \
-    //     unitauto::add_func(vec.at(1), ins, std::get<1>(tup)); \
-    //
-    // too many codes  #define UNITAUTO_ADD_FUNC_20(Type, ...) \
-    //     unitauto::add_struct<Type>(#Type); \
-    //     Type ins = Type(); \
-    //     std::string fs = #__VA_ARGS__; \
-    //     std::vector<std::string> vec = unitauto::splitMethodDef(#__VA_ARGS__); \
-    //     auto tup = std::make_tuple(__VA_ARGS__); \
-    //     unitauto::add_func(vec.at(0), ins, std::get<0>(tup)); \
-    //     unitauto::add_func(vec.at(1), ins, std::get<1>(tup)); \
-    //     unitauto::add_func(vec.at(2), ins, std::get<2>(tup)); \
-    //     unitauto::add_func(vec.at(3), ins, std::get<3>(tup)); \
-    //     unitauto::add_func(vec.at(4), ins, std::get<4>(tup)); \
-    //     unitauto::add_func(vec.at(5), ins, std::get<5>(tup)); \
-    //     unitauto::add_func(vec.at(6), ins, std::get<6>(tup)); \
-    //     unitauto::add_func(vec.at(7), ins, std::get<7>(tup)); \
-    //     unitauto::add_func(vec.at(8), ins, std::get<8>(tup)); \
-    //     unitauto::add_func(vec.at(9), ins, std::get<9>(tup)); \
-    //     unitauto::add_func(vec.at(1), ins, std::get<10>(tup)); \
-    //     unitauto::add_func(vec.at(11), ins, std::get<11>(tup)); \
-    //     unitauto::add_func(vec.at(12), ins, std::get<12>(tup)); \
-    //     unitauto::add_func(vec.at(13), ins, std::get<13>(tup)); \
-    //     unitauto::add_func(vec.at(14), ins, std::get<14>(tup)); \
-    //     unitauto::add_func(vec.at(15), ins, std::get<15>(tup)); \
-    //     unitauto::add_func(vec.at(16), ins, std::get<16>(tup)); \
-    //     unitauto::add_func(vec.at(17), ins, std::get<17>(tup)); \
-    //     unitauto::add_func(vec.at(18), ins, std::get<18>(tup)); \
-    //     unitauto::add_func(vec.at(19), ins, std::get<19>(tup)); \
-
+        unitauto::add_func(s, &ins, &__VA_ARGS__); \
 
     #define UNITAUTO_ADD_FUNC(...) \
         { \
@@ -1984,12 +2018,48 @@ namespace unitauto {
     #define UNITAUTO_ADD_METHOD(Type, ...) \
         { \
             std::string name = #Type; \
-            unitauto::add_struct<Type>(name); \
+            unitauto::add_val<Type>(name); \
             Type ins; /* = Type(); */ \
             const std::type_info& ti = typeid(ins); \
             std::string path = unitauto::demangle(ti.name()); \
             std::string s; \
             UNITAUTO_EXPAND(UNITAUTO_PASTE(UNITAUTO_ADD_METHOD_1, __VA_ARGS__)) \
+        } \
+
+    #define UNITAUTO_ADD_VAL_METHOD_1(...) \
+        s = #__VA_ARGS__; \
+        s = std::regex_replace(s, std::regex(name), path); \
+        s = std::regex_replace(s, std::regex(" "), ""); \
+        s = std::regex_replace(s, std::regex("::"), "."); \
+        unitauto::add_const_func(s, ins, &__VA_ARGS__); \
+
+    #define UNITAUTO_ADD_VAL_METHOD(Type, ...) \
+        { \
+            std::string name = #Type; \
+            unitauto::add_val<Type>(name); \
+            Type ins; /* = Type(); */ \
+            const std::type_info& ti = typeid(ins); \
+            std::string path = unitauto::demangle(ti.name()); \
+            std::string s; \
+            UNITAUTO_EXPAND(UNITAUTO_PASTE(UNITAUTO_ADD_VAL_METHOD_1, __VA_ARGS__)) \
+        } \
+
+    #define UNITAUTO_ADD_PTR_METHOD_1(...) \
+        s = #__VA_ARGS__; \
+        s = std::regex_replace(s, std::regex(name), path); \
+        s = std::regex_replace(s, std::regex(" "), ""); \
+        s = std::regex_replace(s, std::regex("::"), "."); \
+        unitauto::add_func(s, &ins, &__VA_ARGS__); \
+
+    #define UNITAUTO_ADD_PTR_METHOD(Type, ...) \
+        { \
+            std::string name = #Type; \
+            unitauto::add_ptr<Type>(name); \
+            Type ins; /* = Type(); */ \
+            const std::type_info& ti = typeid(ins); \
+            std::string path = unitauto::demangle(ti.name()); \
+            std::string s; \
+            UNITAUTO_EXPAND(UNITAUTO_PASTE(UNITAUTO_ADD_PTR_METHOD_1, __VA_ARGS__)) \
         } \
 
 }

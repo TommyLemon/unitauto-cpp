@@ -105,7 +105,7 @@ public:
         this->content = content;
     }
 
-    std::string getContent() {
+    std::string getContent() const {
         return this->content;
     }
 
@@ -226,16 +226,16 @@ int main() {
     unitauto::DEFAULT_MODULE_PATH = "unitauto"; // TODO 改为你项目的默认包名
 
     // 注册函数
-    UNITAUTO_ADD_FUNC(add, divide, newMoment, unitauto::test::divide, unitauto::test::contains, unitauto::test::index, unitauto::test::is_contain, unitauto::test::index_of);
+    UNITAUTO_ADD_FUNC(add, divide, newMoment, Person::testStatic, unitauto::test::divide, unitauto::test::contains, unitauto::test::index, unitauto::test::is_contain, unitauto::test::index_of);
 
     // 注册类型(class/struct)及方法(成员函数)
-    UNITAUTO_ADD_METHOD(Moment, Moment::getId, Moment::setId, Moment::getUserId, Moment::setUserId, Moment::getContent, Moment::setContent);
+    UNITAUTO_ADD_METHOD(Moment, Moment::getId, Moment::setId, Moment::getUserId, Moment::setUserId, Moment::setContent);
     UNITAUTO_ADD_METHOD(User, User::getId, User::setId, User::getName, User::setName, User::getDate, User::setDate);
     UNITAUTO_ADD_METHOD(unitauto::test::TestUtil, unitauto::test::TestUtil::divide);
-    // UNITAUTO_ADD_METHOD(Person, Person::testStatic);
+    UNITAUTO_ADD_VAL_METHOD(Moment, Moment::getContent); // const 函数
 
     // 自定义注册类型
-    unitauto::add_struct<Person>("Person");
+    unitauto::add_val<Person>("Person");
 
     // 自定义注册函数路径
     unitauto::add_func("main.newMoment", std::function(newMoment));
