@@ -846,11 +846,11 @@ namespace unitauto {
             auto p = &obj;
             return static_cast<void*>(p);
         };
-        PTR_MAP[type + "*"] = PTR_MAP[type + "&"] = cb;
+        PTR_MAP["*" + type] = PTR_MAP["&" + type] = PTR_MAP[type + "*"] = PTR_MAP[type + "&"] = cb;
 
         std::string t = trim_type(demangle(typeid(T).name()));
         if (t != type) {
-            PTR_MAP[t + "*"] = PTR_MAP[t + "&"] = cb;
+            PTR_MAP["*" + t] = PTR_MAP["&" + t] = PTR_MAP[t + "*"] = PTR_MAP[t + "&"] = cb;
             TYEP_ALIAS_MAP[t] = type;
             TYEP_ALIAS_MAP[type] = t;
         }

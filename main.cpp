@@ -214,7 +214,7 @@ int test() {
 
         // malloc: *** error for object 0x16cf96110: pointer being freed was not allocated unitauto::del_obj<User>(obj);
     } else {
-        unitauto::printlnErr("Type match error, have u added type with add_type?");
+        unitauto::printlnErr("Type match error, have u added type with add_ptr?");
     }
 
     return 0;
